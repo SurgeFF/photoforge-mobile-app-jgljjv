@@ -5,23 +5,6 @@
  * This utility provides functions to interact with the PhotoForge backend API.
  * 
  * Base URL: https://photoforge.base44.app
- * 
- * Required API Endpoints:
- * 
- * 1. POST /api/functions/validate-key
- *    - Validates an access key
- *    - Body: { accessKey: string }
- *    - Response: { success: boolean, user?: { id, email, full_name, role }, error?: string }
- * 
- * 2. POST /api/functions/createProjectMobile
- *    - Creates a new project
- *    - Body: { access_key: string, project: object }
- *    - Response: { success: boolean, data?: object, error?: string }
- * 
- * 3. GET /api/entities/Project
- *    - Retrieves user's projects
- *    - Headers: { Authorization: "Bearer <accessKey>" }
- *    - Response: Array of projects
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -29,6 +12,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 const WEBAPP_URL = "https://photoforge.base44.app";
 const FUNCTIONS_BASE = `${WEBAPP_URL}/api/functions`;
 const ENTITIES_BASE = `${WEBAPP_URL}/api/entities`;
+const INTEGRATIONS_BASE = `${WEBAPP_URL}/api/integrations`;
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
 export interface ApiResponse<T> {
@@ -44,6 +28,20 @@ export interface User {
   role: string;
 }
 
+export interface Subscription {
+  status: string;
+  plan_type: string;
+  trial_end_date?: string;
+  subscription_end_date?: string;
+}
+
+export interface DroneInfo {
+  model: string;
+  firmware: string;
+  battery: number;
+  gps_signal: number;
+}
+
 export async function getAccessKey(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
@@ -53,10 +51,10 @@ export async function getAccessKey(): Promise<string | null> {
   }
 }
 
+// ==================== AUTHENTICATION ====================
+
 /**
  * Validate access key with the backend
- * @param accessKey - 24 character access key from user
- * @returns User data if valid, error if invalid
  */
 export async function validateAccessKey(accessKey: string): Promise<ApiResponse<User>> {
   try {
@@ -64,23 +62,16 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
     console.log("🔑 Starting validation...");
     console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/validate-key`);
     console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
-    console.log("📏 Access key length:", accessKey.length);
-    console.log("⏰ Timestamp:", new Date().toISOString());
-    
-    const requestBody = { accessKey };
-    console.log("📦 Request body:", JSON.stringify(requestBody));
     
     const response = await fetch(`${FUNCTIONS_BASE}/validate-key`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({ accessKey }),
     });
 
-    console.log("📨 Response received");
     console.log("📊 Status:", response.status, response.statusText);
-    console.log("✓ OK:", response.ok);
     
     const responseText = await response.text();
     console.log("📄 Response body (raw):", responseText);
@@ -88,11 +79,8 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
     let data;
     try {
       data = JSON.parse(responseText);
-      console.log("📋 Parsed data:", JSON.stringify(data, null, 2));
     } catch (parseError) {
       console.error("❌ JSON parse error:", parseError);
-      console.error("📄 Raw response (first 200 chars):", responseText.substring(0, 200));
-      console.log("========== VALIDATION FAILED (PARSE ERROR) ==========\n");
       return {
         success: false,
         error: "Invalid server response format",
@@ -101,7 +89,6 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
 
     if (response.ok && data.success) {
       console.log("✅ Access key is VALID");
-      console.log("👤 User:", data.user?.email);
       console.log("========== VALIDATION SUCCESS ==========\n");
       return {
         success: true,
@@ -110,7 +97,6 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
     } else {
       const errorMsg = data.error || "Invalid access key";
       console.log("❌ Access key is INVALID");
-      console.log("💬 Error:", errorMsg);
       console.log("========== VALIDATION FAILED ==========\n");
       return {
         success: false,
@@ -118,11 +104,7 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
       };
     }
   } catch (error) {
-    console.error("❌ EXCEPTION during validation");
-    console.error("🔥 Error type:", error?.constructor?.name);
-    console.error("💬 Error message:", error instanceof Error ? error.message : "Unknown error");
-    console.error("📚 Stack trace:", error instanceof Error ? error.stack : "No stack");
-    console.log("========== VALIDATION ERROR ==========\n");
+    console.error("❌ EXCEPTION during validation:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
@@ -131,13 +113,77 @@ export async function validateAccessKey(accessKey: string): Promise<ApiResponse<
 }
 
 /**
+ * Validate mobile access key (alternative endpoint)
+ */
+export async function validateMobileAccessKey(accessKey: string): Promise<ApiResponse<any>> {
+  try {
+    console.log("🔑 Validating mobile access key...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/validateMobileAccessKey`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ access_key: accessKey }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mobile access key validated");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.message || "Invalid access key" };
+    }
+  } catch (error) {
+    console.error("❌ Validate mobile access key error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Generate a new mobile access key (requires web authentication)
+ */
+export async function generateMobileAccessKey(): Promise<ApiResponse<any>> {
+  try {
+    console.log("🔑 Generating mobile access key...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/generateMobileAccessKey`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mobile access key generated");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Failed to generate access key" };
+    }
+  } catch (error) {
+    console.error("❌ Generate access key error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== PROJECT MANAGEMENT ====================
+
+/**
  * Get projects with authenticated access key
- * @param accessKey - Validated access key
  */
 export async function getProjects(accessKey: string): Promise<ApiResponse<any[]>> {
   try {
     console.log("📂 Fetching projects...");
-    console.log("📍 Endpoint:", `${ENTITIES_BASE}/Project`);
     
     const response = await fetch(`${ENTITIES_BASE}/Project`, {
       method: "GET",
@@ -145,8 +191,6 @@ export async function getProjects(accessKey: string): Promise<ApiResponse<any[]>
         "Authorization": `Bearer ${accessKey}`,
       },
     });
-
-    console.log("📊 Projects response status:", response.status);
 
     if (response.ok) {
       const projects = await response.json();
@@ -167,14 +211,41 @@ export async function getProjects(accessKey: string): Promise<ApiResponse<any[]>
 }
 
 /**
+ * Get a specific project by ID
+ */
+export async function getProjectById(accessKey: string, projectId: string): Promise<ApiResponse<any>> {
+  try {
+    console.log("📂 Fetching project by ID:", projectId);
+    
+    const response = await fetch(`${ENTITIES_BASE}/Project/${projectId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessKey}`,
+      },
+    });
+
+    if (response.ok) {
+      const project = await response.json();
+      console.log("✅ Project loaded");
+      return { success: true, data: project };
+    } else {
+      return { success: false, error: "Failed to load project" };
+    }
+  } catch (error) {
+    console.error("❌ Get project error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
  * Create a new project
- * @param accessKey - Validated access key
- * @param project - Project data
  */
 export async function createProject(accessKey: string, project: any): Promise<ApiResponse<any>> {
   try {
     console.log("➕ Creating project...");
-    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/createProjectMobile`);
     
     const response = await fetch(`${FUNCTIONS_BASE}/createProjectMobile`, {
       method: "POST",
@@ -187,8 +258,6 @@ export async function createProject(accessKey: string, project: any): Promise<Ap
       }),
     });
 
-    console.log("📊 Create project response status:", response.status);
-    
     const data = await response.json();
     
     if (response.ok && data.success) {
@@ -209,14 +278,73 @@ export async function createProject(accessKey: string, project: any): Promise<Ap
 }
 
 /**
+ * Get media files for a project
+ */
+export async function getMediaFiles(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
+  try {
+    console.log("📷 Fetching media files for project:", projectId);
+    
+    const response = await fetch(`${ENTITIES_BASE}/MediaFile?project_id=${projectId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessKey}`,
+      },
+    });
+
+    if (response.ok) {
+      const mediaFiles = await response.json();
+      console.log("✅ Media files loaded:", mediaFiles.length);
+      return { success: true, data: mediaFiles };
+    } else {
+      return { success: false, error: "Failed to load media files" };
+    }
+  } catch (error) {
+    console.error("❌ Get media files error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Get processed models for a project
+ */
+export async function getProcessedModels(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
+  try {
+    console.log("🎨 Fetching processed models for project:", projectId);
+    
+    const response = await fetch(`${ENTITIES_BASE}/ProcessedModel?project_id=${projectId}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${accessKey}`,
+      },
+    });
+
+    if (response.ok) {
+      const models = await response.json();
+      console.log("✅ Processed models loaded:", models.length);
+      return { success: true, data: models };
+    } else {
+      return { success: false, error: "Failed to load processed models" };
+    }
+  } catch (error) {
+    console.error("❌ Get processed models error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== MAPPING & TERRAIN ====================
+
+/**
  * Generate topographic map background
- * @param center - [latitude, longitude]
- * @param zoom - Zoom level (3-5 recommended for background)
  */
 export async function generateTopoMap(center?: [number, number], zoom: number = 3): Promise<ApiResponse<string>> {
   try {
     console.log("🗺️ Generating topographic map...");
-    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/generateTopoMap`);
     
     const response = await fetch(`${FUNCTIONS_BASE}/generateTopoMap`, {
       method: "POST",
@@ -229,19 +357,730 @@ export async function generateTopoMap(center?: [number, number], zoom: number = 
       }),
     });
 
-    console.log("📊 Topo map response status:", response.status);
-    
     if (response.ok) {
       const data = await response.json();
       console.log("✅ Topographic map generated");
-      return { success: true, data: data.imageUrl || data.url };
+      return { success: true, data: data.image_url || data.imageUrl || data.url };
     } else {
-      const errorText = await response.text();
-      console.error("❌ Failed to generate topo map:", errorText);
       return { success: false, error: "Failed to generate map" };
     }
   } catch (error) {
     console.error("❌ Topo map error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Generate drone flight plan waypoints
+ */
+export async function generateFlightPlan(params: {
+  area: any;
+  altitude: number;
+  overlap: number;
+  drone_specs?: any;
+}): Promise<ApiResponse<any>> {
+  try {
+    console.log("✈️ Generating flight plan...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/generateFlightPlan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Flight plan generated");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Failed to generate flight plan" };
+    }
+  } catch (error) {
+    console.error("❌ Generate flight plan error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Get elevation data for coordinates
+ */
+export async function getElevationData(coordinates: [number, number][]): Promise<ApiResponse<number[]>> {
+  try {
+    console.log("⛰️ Getting elevation data...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/getElevationData`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ coordinates }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Elevation data retrieved");
+      return { success: true, data: data.elevations };
+    } else {
+      return { success: false, error: data.error || "Failed to get elevation data" };
+    }
+  } catch (error) {
+    console.error("❌ Get elevation data error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== DJI DRONE CONTROL ====================
+
+/**
+ * Connect to DJI drone
+ */
+export async function djiConnect(connectionType: string): Promise<ApiResponse<DroneInfo>> {
+  try {
+    console.log("🚁 Connecting to DJI drone...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiConnect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ connection_type: connectionType }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Connected to DJI drone");
+      return { success: true, data: data.drone_info };
+    } else {
+      return { success: false, error: data.error || "Failed to connect to drone" };
+    }
+  } catch (error) {
+    console.error("❌ DJI connect error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Upload flight plan to DJI drone
+ */
+export async function djiUploadFlightPlan(waypoints: any[], missionSettings: any): Promise<ApiResponse<string>> {
+  try {
+    console.log("📤 Uploading flight plan to drone...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiUploadFlightPlan`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        waypoints,
+        mission_settings: missionSettings,
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Flight plan uploaded");
+      return { success: true, data: data.mission_id };
+    } else {
+      return { success: false, error: data.error || "Failed to upload flight plan" };
+    }
+  } catch (error) {
+    console.error("❌ Upload flight plan error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Start autonomous flight mission
+ */
+export async function djiStartMission(missionId: string): Promise<ApiResponse<string>> {
+  try {
+    console.log("🚀 Starting mission...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiStartMission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ mission_id: missionId }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mission started");
+      return { success: true, data: data.status };
+    } else {
+      return { success: false, error: data.error || "Failed to start mission" };
+    }
+  } catch (error) {
+    console.error("❌ Start mission error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Send manual control commands to drone
+ */
+export async function djiManualControl(command: string, parameters: any): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("🎮 Sending manual control command:", command);
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiManualControl`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ command, parameters }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Manual control command sent");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to send command" };
+    }
+  } catch (error) {
+    console.error("❌ Manual control error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Command drone to return home
+ */
+export async function djiReturnHome(): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("🏠 Commanding drone to return home...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiReturnHome`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Return home command sent");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to return home" };
+    }
+  } catch (error) {
+    console.error("❌ Return home error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Pause current flight mission
+ */
+export async function djiPauseMission(): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("⏸️ Pausing mission...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiPauseMission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mission paused");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to pause mission" };
+    }
+  } catch (error) {
+    console.error("❌ Pause mission error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Resume paused flight mission
+ */
+export async function djiResumeMission(): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("▶️ Resuming mission...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiResumeMission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mission resumed");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to resume mission" };
+    }
+  } catch (error) {
+    console.error("❌ Resume mission error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Stop current flight mission (drone hovers)
+ */
+export async function djiStopMission(): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("⏹️ Stopping mission...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiStopMission`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Mission stopped");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to stop mission" };
+    }
+  } catch (error) {
+    console.error("❌ Stop mission error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Disconnect from DJI drone
+ */
+export async function djiDisconnect(): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("🔌 Disconnecting from drone...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/djiDisconnect`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Disconnected from drone");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Failed to disconnect" };
+    }
+  } catch (error) {
+    console.error("❌ Disconnect error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== PROCESSING ====================
+
+/**
+ * Process drone images using Autodesk Reality Capture
+ */
+export async function autodeskRealityCapture(params: {
+  project_id: string;
+  image_urls: string[];
+  processing_settings?: any;
+}): Promise<ApiResponse<any>> {
+  try {
+    console.log("🎨 Starting Autodesk Reality Capture processing...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/autodeskRealityCapture`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Processing started");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Failed to start processing" };
+    }
+  } catch (error) {
+    console.error("❌ Autodesk processing error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== SUBSCRIPTION & PAYMENT ====================
+
+/**
+ * Check subscription status
+ */
+export async function checkSubscription(accessKey: string): Promise<ApiResponse<Subscription>> {
+  try {
+    console.log("💳 Checking subscription status...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/checkSubscription`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Subscription status retrieved");
+      return { success: true, data: data.subscription };
+    } else {
+      return { success: false, error: data.error || "Failed to check subscription" };
+    }
+  } catch (error) {
+    console.error("❌ Check subscription error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Process payment via Square
+ */
+export async function squarePayment(accessKey: string, params: {
+  payment_type: string;
+  amount: number;
+  nonce: string;
+  idempotency_key: string;
+}): Promise<ApiResponse<any>> {
+  try {
+    console.log("💰 Processing Square payment...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/squarePayment`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Payment processed");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Payment failed" };
+    }
+  } catch (error) {
+    console.error("❌ Square payment error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Test Square credentials (admin only)
+ */
+export async function testSquareCredentials(accessKey: string): Promise<ApiResponse<any>> {
+  try {
+    console.log("🔧 Testing Square credentials...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/testSquareCredentials`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Square credentials tested");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Failed to test credentials" };
+    }
+  } catch (error) {
+    console.error("❌ Test Square credentials error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== SUPPORT ====================
+
+/**
+ * Submit a support ticket
+ */
+export async function submitSupportTicket(accessKey: string, params: {
+  subject: string;
+  message: string;
+  category: string;
+}): Promise<ApiResponse<string>> {
+  try {
+    console.log("📧 Submitting support ticket...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/submitSupportTicket`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Support ticket submitted");
+      return { success: true, data: data.ticket_id };
+    } else {
+      return { success: false, error: data.error || "Failed to submit ticket" };
+    }
+  } catch (error) {
+    console.error("❌ Submit support ticket error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== CORE INTEGRATIONS ====================
+
+/**
+ * Invoke LLM for AI responses
+ */
+export async function invokeLLM(params: {
+  prompt: string;
+  context?: string;
+  schema?: any;
+}): Promise<ApiResponse<any>> {
+  try {
+    console.log("🤖 Invoking LLM...");
+    
+    const response = await fetch(`${INTEGRATIONS_BASE}/Core/InvokeLLM`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ LLM response received");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "LLM invocation failed" };
+    }
+  } catch (error) {
+    console.error("❌ Invoke LLM error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Upload file to public storage
+ */
+export async function uploadFile(file: any): Promise<ApiResponse<string>> {
+  try {
+    console.log("📤 Uploading file...");
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch(`${INTEGRATIONS_BASE}/Core/UploadFile`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ File uploaded");
+      return { success: true, data: data.file_url };
+    } else {
+      return { success: false, error: data.error || "File upload failed" };
+    }
+  } catch (error) {
+    console.error("❌ Upload file error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Generate AI image from text prompt
+ */
+export async function generateImage(prompt: string): Promise<ApiResponse<string>> {
+  try {
+    console.log("🎨 Generating AI image...");
+    
+    const response = await fetch(`${INTEGRATIONS_BASE}/Core/GenerateImage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Image generated");
+      return { success: true, data: data.image_url };
+    } else {
+      return { success: false, error: data.error || "Image generation failed" };
+    }
+  } catch (error) {
+    console.error("❌ Generate image error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Send transactional email
+ */
+export async function sendEmail(params: {
+  to: string;
+  subject: string;
+  body: string;
+}): Promise<ApiResponse<boolean>> {
+  try {
+    console.log("📧 Sending email...");
+    
+    const response = await fetch(`${INTEGRATIONS_BASE}/Core/SendEmail`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Email sent");
+      return { success: true, data: true };
+    } else {
+      return { success: false, error: data.error || "Email sending failed" };
+    }
+  } catch (error) {
+    console.error("❌ Send email error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Extract data from uploaded file using AI
+ */
+export async function extractDataFromUploadedFile(fileUrl: string): Promise<ApiResponse<any>> {
+  try {
+    console.log("📄 Extracting data from file...");
+    
+    const response = await fetch(`${INTEGRATIONS_BASE}/Core/ExtractDataFromUploadedFile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ file_url: fileUrl }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Data extracted");
+      return { success: true, data };
+    } else {
+      return { success: false, error: data.error || "Data extraction failed" };
+    }
+  } catch (error) {
+    console.error("❌ Extract data error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
