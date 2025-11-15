@@ -31,24 +31,47 @@ import {
 } from "@/utils/apiClient";
 
 interface TelemetryData {
-  battery: number;
-  voltage: number;
-  cell_status: string;
-  latitude: number;
-  longitude: number;
-  altitude: number;
-  satellite_count: number;
-  speed: number;
-  distance_from_home: number;
-  flight_time: number;
-  gimbal_pitch: number;
-  gimbal_roll: number;
-  gimbal_yaw: number;
-  status: string;
-  armed: boolean;
-  flying: boolean;
-  returning_home: boolean;
-  error_codes: string[];
+  timestamp: string;
+  battery: {
+    percentage: number;
+    voltage: number;
+    current: number;
+    temperature: number;
+  };
+  gps: {
+    latitude: number;
+    longitude: number;
+    altitude: number;
+    satellite_count: number;
+    signal_strength: number;
+  };
+  flight: {
+    speed_horizontal: number;
+    speed_vertical: number;
+    altitude_agl: number;
+    distance_from_home: number;
+    heading: number;
+    flight_time_seconds: number;
+  };
+  gimbal: {
+    pitch: number;
+    roll: number;
+    yaw: number;
+  };
+  status: {
+    flying: boolean;
+    armed: boolean;
+    gps_fixed: boolean;
+    vision_enabled: boolean;
+    mode: string;
+    error_codes: string[];
+  };
+  camera: {
+    recording: boolean;
+    sd_capacity_gb: number;
+    sd_remaining_gb: number;
+    photo_count: number;
+  };
 }
 
 interface DroneStatus {
@@ -80,6 +103,7 @@ export default function DroneControlScreen() {
   const [showConnectionModal, setShowConnectionModal] = useState(false);
   const [showManualControlModal, setShowManualControlModal] = useState(false);
   const [showMissionModal, setShowMissionModal] = useState(false);
+  const [showEmergencyStopModal, setShowEmergencyStopModal] = useState(false);
   const [missions, setMissions] = useState<Mission[]>([
     { id: "mission_1", name: "Survey Area A", waypoint_count: 45, estimated_time: 18 },
     { id: "mission_2", name: "Inspection Route", waypoint_count: 28, estimated_time: 12 },
@@ -92,7 +116,11 @@ export default function DroneControlScreen() {
     z: "0",
     yaw: "0",
   });
+  const [safetyWarnings, setSafetyWarnings] = useState<string[]>([]);
+  const [connectionLost, setConnectionLost] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
+  const lastTelemetryUpdate = useRef<number>(Date.now());
+  const connectionCheckInterval = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     // Cleanup WebSocket on unmount
@@ -101,8 +129,101 @@ export default function DroneControlScreen() {
         wsRef.current.close();
         wsRef.current = null;
       }
+      if (connectionCheckInterval.current) {
+        clearInterval(connectionCheckInterval.current);
+      }
     };
   }, []);
+
+  // Monitor connection health
+  useEffect(() => {
+    if (droneStatus.connected) {
+      connectionCheckInterval.current = setInterval(() => {
+        const timeSinceLastUpdate = Date.now() - lastTelemetryUpdate.current;
+        if (timeSinceLastUpdate > 3000) {
+          // No telemetry for 3 seconds
+          setConnectionLost(true);
+          Alert.alert(
+            "Connection Lost",
+            "Lost connection to drone. Drone will follow failsafe behavior (RTH or hover). Attempting to reconnect...",
+            [{ text: "OK" }]
+          );
+        }
+      }, 1000);
+    } else {
+      if (connectionCheckInterval.current) {
+        clearInterval(connectionCheckInterval.current);
+      }
+      setConnectionLost(false);
+    }
+
+    return () => {
+      if (connectionCheckInterval.current) {
+        clearInterval(connectionCheckInterval.current);
+      }
+    };
+  }, [droneStatus.connected]);
+
+  // Check for safety warnings
+  useEffect(() => {
+    if (!droneStatus.telemetry) return;
+
+    const warnings: string[] = [];
+    const telemetry = droneStatus.telemetry;
+
+    // Low battery warning
+    if (telemetry.battery.percentage <= 20) {
+      warnings.push("CRITICAL: Battery at 20% or below - Return home immediately!");
+      // Auto-trigger RTH at 20%
+      if (telemetry.battery.percentage === 20 && telemetry.status.flying) {
+        Alert.alert(
+          "Critical Battery Level",
+          "Battery at 20%. Initiating automatic Return to Home.",
+          [
+            {
+              text: "Cancel RTH",
+              style: "cancel",
+            },
+            {
+              text: "Return Home",
+              onPress: handleReturnHome,
+            },
+          ]
+        );
+      }
+    } else if (telemetry.battery.percentage <= 30) {
+      warnings.push("WARNING: Battery below 30% - Consider returning home");
+    }
+
+    // GPS signal warning
+    if (!telemetry.status.gps_fixed) {
+      warnings.push("WARNING: GPS signal lost - Switching to vision positioning");
+    } else if (telemetry.gps.satellite_count < 8) {
+      warnings.push("WARNING: Weak GPS signal - " + telemetry.gps.satellite_count + " satellites");
+    }
+
+    // Connection warning
+    if (connectionLost) {
+      warnings.push("ERROR: Connection lost - Drone following failsafe behavior");
+    }
+
+    // Error codes
+    if (telemetry.status.error_codes.length > 0) {
+      warnings.push("ERROR: " + telemetry.status.error_codes.join(", "));
+    }
+
+    // High temperature warning
+    if (telemetry.battery.temperature > 50) {
+      warnings.push("WARNING: Battery temperature high (" + telemetry.battery.temperature + "°C)");
+    }
+
+    // SD card warning
+    if (telemetry.camera.sd_remaining_gb < 2) {
+      warnings.push("WARNING: SD card almost full - " + telemetry.camera.sd_remaining_gb + "GB remaining");
+    }
+
+    setSafetyWarnings(warnings);
+  }, [droneStatus.telemetry, connectionLost]);
 
   // Simulate WebSocket telemetry updates
   useEffect(() => {
@@ -112,15 +233,30 @@ export default function DroneControlScreen() {
       const interval = setInterval(() => {
         setDroneStatus((prev) => {
           if (!prev.telemetry) return prev;
-          
+
+          lastTelemetryUpdate.current = Date.now();
+          setConnectionLost(false);
+
           return {
             ...prev,
             telemetry: {
               ...prev.telemetry,
-              battery: Math.max(0, prev.telemetry.battery - 0.1),
-              altitude: prev.telemetry.altitude + (Math.random() - 0.5) * 0.5,
-              speed: Math.max(0, prev.telemetry.speed + (Math.random() - 0.5) * 0.2),
-              flight_time: prev.telemetry.flight_time + 0.1,
+              timestamp: new Date().toISOString(),
+              battery: {
+                ...prev.telemetry.battery,
+                percentage: Math.max(0, prev.telemetry.battery.percentage - 0.05),
+                temperature: prev.telemetry.battery.temperature + (Math.random() - 0.5) * 0.5,
+              },
+              gps: {
+                ...prev.telemetry.gps,
+                altitude: prev.telemetry.gps.altitude + (Math.random() - 0.5) * 0.5,
+              },
+              flight: {
+                ...prev.telemetry.flight,
+                speed_horizontal: Math.max(0, prev.telemetry.flight.speed_horizontal + (Math.random() - 0.5) * 0.2),
+                altitude_agl: prev.telemetry.flight.altitude_agl + (Math.random() - 0.5) * 0.5,
+                flight_time_seconds: prev.telemetry.flight.flight_time_seconds + 0.1,
+              },
             },
           };
         });
@@ -133,30 +269,53 @@ export default function DroneControlScreen() {
   const handleConnect = async () => {
     setIsConnecting(true);
     setShowConnectionModal(false);
-    
+
     try {
       const result = await djiConnect(connectionType);
       if (result.success && result.data) {
-        // Initialize telemetry data
+        // Initialize telemetry data with full structure
         const initialTelemetry: TelemetryData = {
-          battery: 95,
-          voltage: 12.6,
-          cell_status: "Good",
-          latitude: 37.7749,
-          longitude: -122.4194,
-          altitude: 0,
-          satellite_count: 18,
-          speed: 0,
-          distance_from_home: 0,
-          flight_time: 0,
-          gimbal_pitch: -90,
-          gimbal_roll: 0,
-          gimbal_yaw: 0,
-          status: "Ready",
-          armed: false,
-          flying: false,
-          returning_home: false,
-          error_codes: [],
+          timestamp: new Date().toISOString(),
+          battery: {
+            percentage: 95,
+            voltage: 15.2,
+            current: 0,
+            temperature: 25,
+          },
+          gps: {
+            latitude: 37.7749,
+            longitude: -122.4194,
+            altitude: 125.3,
+            satellite_count: 18,
+            signal_strength: 5,
+          },
+          flight: {
+            speed_horizontal: 0,
+            speed_vertical: 0,
+            altitude_agl: 0,
+            distance_from_home: 0,
+            heading: 0,
+            flight_time_seconds: 0,
+          },
+          gimbal: {
+            pitch: -90,
+            roll: 0,
+            yaw: 0,
+          },
+          status: {
+            flying: false,
+            armed: false,
+            gps_fixed: true,
+            vision_enabled: true,
+            mode: "p_gps",
+            error_codes: [],
+          },
+          camera: {
+            recording: false,
+            sd_capacity_gb: 64,
+            sd_remaining_gb: 48,
+            photo_count: 0,
+          },
         };
 
         setDroneStatus({
@@ -167,7 +326,8 @@ export default function DroneControlScreen() {
           telemetry: initialTelemetry,
           telemetry_ws_url: "ws://drone-telemetry.local:8080",
         });
-        
+
+        lastTelemetryUpdate.current = Date.now();
         Alert.alert("Success", `Connected to ${result.data.model || "drone"} successfully!`);
       } else {
         Alert.alert("Error", result.error || "Failed to connect to drone");
@@ -186,6 +346,8 @@ export default function DroneControlScreen() {
       if (result.success) {
         setDroneStatus({ connected: false });
         setSelectedMission(null);
+        setSafetyWarnings([]);
+        setConnectionLost(false);
         if (wsRef.current) {
           wsRef.current.close();
           wsRef.current = null;
@@ -200,10 +362,48 @@ export default function DroneControlScreen() {
     }
   };
 
+  const handleEmergencyStop = async () => {
+    setShowEmergencyStopModal(true);
+  };
+
+  const executeEmergencyStop = async () => {
+    setShowEmergencyStopModal(false);
+    try {
+      // Stop all movement immediately
+      const result = await djiManualControl("emergency_stop", {});
+      if (result.success) {
+        if (droneStatus.telemetry) {
+          setDroneStatus({
+            ...droneStatus,
+            missionActive: false,
+            telemetry: {
+              ...droneStatus.telemetry,
+              flight: {
+                ...droneStatus.telemetry.flight,
+                speed_horizontal: 0,
+                speed_vertical: 0,
+              },
+              status: {
+                ...droneStatus.telemetry.status,
+                mode: "hover",
+              },
+            },
+          });
+        }
+        Alert.alert("Emergency Stop", "All drone movement halted. Drone is hovering in place.");
+      } else {
+        Alert.alert("Error", result.error || "Failed to execute emergency stop");
+      }
+    } catch (error) {
+      console.error("Emergency stop error:", error);
+      Alert.alert("Error", "Failed to execute emergency stop");
+    }
+  };
+
   const handleManualControl = async (command: string) => {
     try {
       let parameters = {};
-      
+
       if (command === "move") {
         parameters = {
           x: parseFloat(manualCommand.x),
@@ -220,16 +420,19 @@ export default function DroneControlScreen() {
       if (result.success) {
         Alert.alert("Success", `${command} command sent successfully`);
         setShowManualControlModal(false);
-        
+
         // Update telemetry based on command
         if (command === "takeoff" && droneStatus.telemetry) {
           setDroneStatus({
             ...droneStatus,
             telemetry: {
               ...droneStatus.telemetry,
-              armed: true,
-              flying: true,
-              status: "Flying",
+              status: {
+                ...droneStatus.telemetry.status,
+                armed: true,
+                flying: true,
+                mode: "takeoff",
+              },
             },
           });
         } else if (command === "land" && droneStatus.telemetry) {
@@ -237,8 +440,11 @@ export default function DroneControlScreen() {
             ...droneStatus,
             telemetry: {
               ...droneStatus.telemetry,
-              flying: false,
-              status: "Landing",
+              status: {
+                ...droneStatus.telemetry.status,
+                flying: false,
+                mode: "landing",
+              },
             },
           });
         }
@@ -292,8 +498,10 @@ export default function DroneControlScreen() {
                     ...droneStatus,
                     telemetry: {
                       ...droneStatus.telemetry,
-                      returning_home: true,
-                      status: "Returning Home",
+                      status: {
+                        ...droneStatus.telemetry.status,
+                        mode: "returning_home",
+                      },
                     },
                   });
                 }
@@ -382,10 +590,16 @@ export default function DroneControlScreen() {
     return colors.error;
   };
 
+  const formatFlightTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TopographicBackground />
-      
+
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
@@ -398,6 +612,50 @@ export default function DroneControlScreen() {
         <Text style={styles.headerTitle}>Live Drone Control</Text>
         <View style={styles.placeholder} />
       </View>
+
+      {/* Emergency Stop Button - Always visible when connected */}
+      {droneStatus.connected && (
+        <View style={styles.emergencyStopContainer}>
+          <Pressable
+            style={styles.emergencyStopButton}
+            onPress={handleEmergencyStop}
+          >
+            <IconSymbol
+              ios_icon_name="exclamationmark.octagon.fill"
+              android_material_icon_name="warning"
+              size={32}
+              color={colors.surface}
+            />
+            <Text style={styles.emergencyStopText}>EMERGENCY STOP</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* Safety Warnings Banner */}
+      {safetyWarnings.length > 0 && (
+        <View style={styles.warningsBanner}>
+          {safetyWarnings.map((warning, index) => (
+            <View key={index} style={styles.warningItem}>
+              <IconSymbol
+                ios_icon_name="exclamationmark.triangle.fill"
+                android_material_icon_name="warning"
+                size={20}
+                color={warning.includes("CRITICAL") || warning.includes("ERROR") ? colors.error : colors.warning}
+              />
+              <Text
+                style={[
+                  styles.warningText,
+                  {
+                    color: warning.includes("CRITICAL") || warning.includes("ERROR") ? colors.error : colors.warning,
+                  },
+                ]}
+              >
+                {warning}
+              </Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       <ScrollView
         style={styles.scrollView}
@@ -417,14 +675,20 @@ export default function DroneControlScreen() {
                 styles.statusIndicator,
                 {
                   backgroundColor: droneStatus.connected
-                    ? colors.success
+                    ? connectionLost
+                      ? colors.warning
+                      : colors.success
                     : colors.textSecondary,
                 },
               ]}
             />
           </View>
           <Text style={styles.statusTitle}>
-            {droneStatus.connected ? "Connected" : "Disconnected"}
+            {droneStatus.connected
+              ? connectionLost
+                ? "Connection Lost"
+                : "Connected"
+              : "Disconnected"}
           </Text>
           {droneStatus.model && (
             <React.Fragment>
@@ -455,10 +719,10 @@ export default function DroneControlScreen() {
                     ios_icon_name="battery.100"
                     android_material_icon_name="battery_full"
                     size={24}
-                    color={getBatteryColor(droneStatus.telemetry.battery)}
+                    color={getBatteryColor(droneStatus.telemetry.battery.percentage)}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.battery.toFixed(1)}%
+                    {droneStatus.telemetry.battery.percentage.toFixed(1)}%
                   </Text>
                   <Text style={styles.telemetryLabel}>Charge</Text>
                 </View>
@@ -470,21 +734,21 @@ export default function DroneControlScreen() {
                     color={colors.primary}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.voltage.toFixed(1)}V
+                    {droneStatus.telemetry.battery.voltage.toFixed(1)}V
                   </Text>
                   <Text style={styles.telemetryLabel}>Voltage</Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <IconSymbol
-                    ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check_circle"
+                    ios_icon_name="thermometer"
+                    android_material_icon_name="thermostat"
                     size={24}
-                    color={colors.success}
+                    color={droneStatus.telemetry.battery.temperature > 50 ? colors.error : colors.success}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.cell_status}
+                    {droneStatus.telemetry.battery.temperature.toFixed(1)}°C
                   </Text>
-                  <Text style={styles.telemetryLabel}>Cell Status</Text>
+                  <Text style={styles.telemetryLabel}>Temperature</Text>
                 </View>
               </View>
             </View>
@@ -498,10 +762,10 @@ export default function DroneControlScreen() {
                     ios_icon_name="location.fill"
                     android_material_icon_name="gps_fixed"
                     size={24}
-                    color={getGPSColor(droneStatus.telemetry.satellite_count)}
+                    color={getGPSColor(droneStatus.telemetry.gps.satellite_count)}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.satellite_count}
+                    {droneStatus.telemetry.gps.satellite_count}
                   </Text>
                   <Text style={styles.telemetryLabel}>Satellites</Text>
                 </View>
@@ -513,9 +777,9 @@ export default function DroneControlScreen() {
                     color={colors.primaryDark}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.altitude.toFixed(1)}m
+                    {droneStatus.telemetry.flight.altitude_agl.toFixed(1)}m
                   </Text>
-                  <Text style={styles.telemetryLabel}>Altitude</Text>
+                  <Text style={styles.telemetryLabel}>Altitude AGL</Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <IconSymbol
@@ -525,17 +789,20 @@ export default function DroneControlScreen() {
                     color={colors.primary}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.distance_from_home.toFixed(0)}m
+                    {droneStatus.telemetry.flight.distance_from_home.toFixed(0)}m
                   </Text>
                   <Text style={styles.telemetryLabel}>From Home</Text>
                 </View>
               </View>
               <View style={styles.coordinatesCard}>
                 <Text style={styles.coordinatesText}>
-                  Lat: {droneStatus.telemetry.latitude.toFixed(6)}°
+                  Lat: {droneStatus.telemetry.gps.latitude.toFixed(6)}°
                 </Text>
                 <Text style={styles.coordinatesText}>
-                  Lon: {droneStatus.telemetry.longitude.toFixed(6)}°
+                  Lon: {droneStatus.telemetry.gps.longitude.toFixed(6)}°
+                </Text>
+                <Text style={styles.coordinatesText}>
+                  GPS Fixed: {droneStatus.telemetry.status.gps_fixed ? "Yes" : "No"}
                 </Text>
               </View>
             </View>
@@ -552,9 +819,21 @@ export default function DroneControlScreen() {
                     color={colors.primary}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.speed.toFixed(1)} m/s
+                    {droneStatus.telemetry.flight.speed_horizontal.toFixed(1)} m/s
                   </Text>
-                  <Text style={styles.telemetryLabel}>Speed</Text>
+                  <Text style={styles.telemetryLabel}>H-Speed</Text>
+                </View>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name="arrow.up.arrow.down"
+                    android_material_icon_name="swap_vert"
+                    size={24}
+                    color={colors.primaryDark}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.flight.speed_vertical.toFixed(1)} m/s
+                  </Text>
+                  <Text style={styles.telemetryLabel}>V-Speed</Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <IconSymbol
@@ -564,28 +843,51 @@ export default function DroneControlScreen() {
                     color={colors.primaryDark}
                   />
                   <Text style={styles.telemetryValue}>
-                    {Math.floor(droneStatus.telemetry.flight_time / 60)}:
-                    {Math.floor(droneStatus.telemetry.flight_time % 60)
-                      .toString()
-                      .padStart(2, "0")}
+                    {formatFlightTime(droneStatus.telemetry.flight.flight_time_seconds)}
                   </Text>
                   <Text style={styles.telemetryLabel}>Flight Time</Text>
+                </View>
+              </View>
+              <View style={styles.telemetryGrid}>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name="safari"
+                    android_material_icon_name="explore"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.flight.heading.toFixed(0)}°
+                  </Text>
+                  <Text style={styles.telemetryLabel}>Heading</Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <IconSymbol
                     ios_icon_name={
-                      droneStatus.telemetry.flying
+                      droneStatus.telemetry.status.flying
                         ? "airplane"
                         : "airplane.departure"
                     }
                     android_material_icon_name={
-                      droneStatus.telemetry.flying ? "flight" : "flight_takeoff"
+                      droneStatus.telemetry.status.flying ? "flight" : "flight_takeoff"
                     }
                     size={24}
-                    color={droneStatus.telemetry.flying ? colors.success : colors.textSecondary}
+                    color={droneStatus.telemetry.status.flying ? colors.success : colors.textSecondary}
                   />
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.status}
+                    {droneStatus.telemetry.status.mode.toUpperCase()}
+                  </Text>
+                  <Text style={styles.telemetryLabel}>Mode</Text>
+                </View>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name={droneStatus.telemetry.status.armed ? "checkmark.shield.fill" : "shield"}
+                    android_material_icon_name={droneStatus.telemetry.status.armed ? "verified_user" : "security"}
+                    size={24}
+                    color={droneStatus.telemetry.status.armed ? colors.success : colors.textSecondary}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.status.armed ? "Armed" : "Disarmed"}
                   </Text>
                   <Text style={styles.telemetryLabel}>Status</Text>
                 </View>
@@ -599,20 +901,63 @@ export default function DroneControlScreen() {
                 <View style={styles.telemetryCard}>
                   <Text style={styles.gimbalLabel}>Pitch</Text>
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.gimbal_pitch.toFixed(1)}°
+                    {droneStatus.telemetry.gimbal.pitch.toFixed(1)}°
                   </Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <Text style={styles.gimbalLabel}>Roll</Text>
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.gimbal_roll.toFixed(1)}°
+                    {droneStatus.telemetry.gimbal.roll.toFixed(1)}°
                   </Text>
                 </View>
                 <View style={styles.telemetryCard}>
                   <Text style={styles.gimbalLabel}>Yaw</Text>
                   <Text style={styles.telemetryValue}>
-                    {droneStatus.telemetry.gimbal_yaw.toFixed(1)}°
+                    {droneStatus.telemetry.gimbal.yaw.toFixed(1)}°
                   </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Camera Section */}
+            <View style={styles.telemetrySection}>
+              <Text style={styles.subsectionTitle}>Camera & Storage</Text>
+              <View style={styles.telemetryGrid}>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name={droneStatus.telemetry.camera.recording ? "record.circle.fill" : "record.circle"}
+                    android_material_icon_name={droneStatus.telemetry.camera.recording ? "fiber_manual_record" : "radio_button_unchecked"}
+                    size={24}
+                    color={droneStatus.telemetry.camera.recording ? colors.error : colors.textSecondary}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.camera.recording ? "Recording" : "Standby"}
+                  </Text>
+                  <Text style={styles.telemetryLabel}>Camera</Text>
+                </View>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name="photo.fill"
+                    android_material_icon_name="photo"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.camera.photo_count}
+                  </Text>
+                  <Text style={styles.telemetryLabel}>Photos</Text>
+                </View>
+                <View style={styles.telemetryCard}>
+                  <IconSymbol
+                    ios_icon_name="sdcard.fill"
+                    android_material_icon_name="sd_card"
+                    size={24}
+                    color={droneStatus.telemetry.camera.sd_remaining_gb < 2 ? colors.error : colors.success}
+                  />
+                  <Text style={styles.telemetryValue}>
+                    {droneStatus.telemetry.camera.sd_remaining_gb}GB
+                  </Text>
+                  <Text style={styles.telemetryLabel}>SD Free</Text>
                 </View>
               </View>
             </View>
@@ -804,7 +1149,7 @@ export default function DroneControlScreen() {
           />
           <Text style={styles.infoText}>
             {droneStatus.connected
-              ? "Telemetry updates 10 times per second. Always maintain visual line of sight with your drone."
+              ? "Telemetry updates 10 times per second. Always maintain visual line of sight with your drone. Use EMERGENCY STOP button to halt all movement immediately."
               : "Make sure your DJI drone is powered on and in range before connecting. Supports USB, WiFi, and Cloud connections."}
           </Text>
         </View>
@@ -820,7 +1165,7 @@ export default function DroneControlScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Connection Method</Text>
-            
+
             <Pressable
               style={[
                 styles.connectionOption,
@@ -1102,6 +1447,50 @@ export default function DroneControlScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Emergency Stop Confirmation Modal */}
+      <Modal
+        visible={showEmergencyStopModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowEmergencyStopModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, styles.emergencyModalContent]}>
+            <IconSymbol
+              ios_icon_name="exclamationmark.octagon.fill"
+              android_material_icon_name="warning"
+              size={64}
+              color={colors.error}
+            />
+            <Text style={styles.emergencyModalTitle}>EMERGENCY STOP</Text>
+            <Text style={styles.emergencyModalText}>
+              This will immediately halt all drone movement. The drone will hover in place.
+            </Text>
+            <Text style={styles.emergencyModalWarning}>
+              Use only in emergency situations!
+            </Text>
+
+            <View style={styles.modalButtons}>
+              <Button
+                onPress={() => setShowEmergencyStopModal(false)}
+                variant="outline"
+                style={styles.modalButton}
+              >
+                <Text style={[styles.buttonText, { color: colors.textSecondary }]}>
+                  Cancel
+                </Text>
+              </Button>
+              <Button
+                onPress={executeEmergencyStop}
+                style={[styles.modalButton, styles.emergencyButton]}
+              >
+                <Text style={styles.buttonText}>STOP NOW</Text>
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1134,6 +1523,47 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  emergencyStopContainer: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  emergencyStopButton: {
+    backgroundColor: colors.error,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+    boxShadow: "0px 4px 12px rgba(220, 38, 38, 0.3)",
+  },
+  emergencyStopText: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: colors.surface,
+    letterSpacing: 1,
+  },
+  warningsBanner: {
+    backgroundColor: colors.warning + "20",
+    borderLeftWidth: 4,
+    borderLeftColor: colors.warning,
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  warningItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 6,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "600",
+    lineHeight: 18,
   },
   scrollView: {
     flex: 1,
@@ -1459,5 +1889,33 @@ const styles = StyleSheet.create({
   missionItemDetail: {
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  emergencyModalContent: {
+    alignItems: "center",
+  },
+  emergencyModalTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.error,
+    marginTop: 16,
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  emergencyModalText: {
+    fontSize: 16,
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  emergencyModalWarning: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.error,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+  emergencyButton: {
+    backgroundColor: colors.error,
   },
 });
