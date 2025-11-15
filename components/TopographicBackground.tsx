@@ -49,7 +49,7 @@ export default function TopographicBackground() {
           fill="url(#bgGrad)"
         />
         
-        {/* Topographic contour lines - primary layer */}
+        {/* Topographic contour lines - primary layer (DARKER & CLEARER) */}
         {[...Array(20)].map((_, index) => {
           const yOffset = (height / 19) * index;
           const amplitude = 15 + Math.sin(index * 0.4) * 10;
@@ -61,14 +61,14 @@ export default function TopographicBackground() {
               key={`contour-${index}`}
               d={generateContourPath(yOffset, amplitude, frequency, phase)}
               stroke={colors.accentBorder}
-              strokeWidth={index % 3 === 0 ? 1.5 : 0.8}
-              strokeOpacity={index % 3 === 0 ? 0.25 : 0.15}
+              strokeWidth={index % 3 === 0 ? 2.5 : 1.5}
+              strokeOpacity={index % 3 === 0 ? 0.5 : 0.35}
               fill="none"
             />
           );
         })}
         
-        {/* Secondary contour lines - offset pattern */}
+        {/* Secondary contour lines - offset pattern (DARKER) */}
         {[...Array(15)].map((_, index) => {
           const yOffset = (height / 14) * index + 25;
           const amplitude = 20 + Math.cos(index * 0.6) * 12;
@@ -80,14 +80,14 @@ export default function TopographicBackground() {
               key={`contour-sec-${index}`}
               d={generateContourPath(yOffset, amplitude, frequency, phase)}
               stroke={colors.primary}
-              strokeWidth={0.5}
-              strokeOpacity={0.08}
+              strokeWidth={1}
+              strokeOpacity={0.2}
               fill="none"
             />
           );
         })}
         
-        {/* Tertiary fine detail lines */}
+        {/* Tertiary fine detail lines (DARKER) */}
         {[...Array(25)].map((_, index) => {
           const yOffset = (height / 24) * index + 10;
           const amplitude = 8 + Math.sin(index * 0.8) * 5;
@@ -99,18 +99,18 @@ export default function TopographicBackground() {
               key={`detail-${index}`}
               d={generateContourPath(yOffset, amplitude, frequency, phase)}
               stroke={colors.textSecondary}
-              strokeWidth={0.3}
-              strokeOpacity={0.06}
+              strokeWidth={0.6}
+              strokeOpacity={0.15}
               fill="none"
             />
           );
         })}
         
-        {/* Subtle elevation markers (dots) */}
+        {/* Subtle elevation markers (dots) - MORE VISIBLE */}
         {[...Array(30)].map((_, index) => {
           const x = (Math.random() * width);
           const y = (Math.random() * height);
-          const size = Math.random() * 2 + 0.5;
+          const size = Math.random() * 2.5 + 1;
           
           return (
             <Circle
@@ -119,7 +119,7 @@ export default function TopographicBackground() {
               cy={y}
               r={size}
               fill={colors.accentBorder}
-              opacity={0.1}
+              opacity={0.25}
             />
           );
         })}

@@ -17,7 +17,7 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
-import { validateAccessKey } from "@/utils/apiClient";
+import { validateAccessKey, getProjects } from "@/utils/apiClient";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
@@ -29,10 +29,28 @@ export default function HomeScreen() {
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
+  const [projectCount, setProjectCount] = useState(0);
 
   useEffect(() => {
     checkStoredAccessKey();
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && accessKey) {
+      loadProjects();
+    }
+  }, [isAuthenticated, accessKey]);
+
+  const loadProjects = async () => {
+    try {
+      const result = await getProjects(accessKey);
+      if (result.success && result.data) {
+        setProjectCount(result.data.length);
+      }
+    } catch (error) {
+      console.error("[HomeScreen] Error loading projects:", error);
+    }
+  };
 
   const checkStoredAccessKey = async () => {
     try {
@@ -122,6 +140,7 @@ export default function HomeScreen() {
             setIsAuthenticated(false);
             setAccessKey("");
             setUserName("");
+            setProjectCount(0);
             console.log("[HomeScreen] Logged out successfully");
           },
         },
@@ -157,7 +176,7 @@ export default function HomeScreen() {
                 />
               </View>
               <Text style={styles.title}>PhotoForge</Text>
-              <Text style={styles.subtitle}>Drone Mapping</Text>
+              <Text style={styles.subtitle}>Drone Mapping & Photogrammetry</Text>
             </View>
 
             <View style={styles.formContainer}>
@@ -230,7 +249,7 @@ export default function HomeScreen() {
     );
   }
 
-  // Main authenticated view
+  // Main authenticated view - Dashboard
   return (
     <View style={styles.container}>
       <TopographicBackground />
@@ -239,37 +258,146 @@ export default function HomeScreen() {
         contentContainerStyle={styles.mainContent}
       >
         <View style={styles.header}>
-          <Text style={styles.welcomeTitle}>PhotoForge Studio</Text>
+          <Text style={styles.welcomeTitle}>PhotoForge</Text>
           <Text style={styles.welcomeSubtitle}>
-            {userName ? `Welcome back, ${userName}` : "Create stunning AI-powered images"}
+            {userName ? `Welcome back, ${userName}` : "Drone Mapping Dashboard"}
           </Text>
         </View>
 
+        {/* Quick Stats */}
+        <View style={styles.statsContainer}>
+          <View style={styles.statCard}>
+            <IconSymbol
+              ios_icon_name="folder.fill"
+              android_material_icon_name="folder"
+              size={28}
+              color={colors.primary}
+            />
+            <Text style={styles.statNumber}>{projectCount}</Text>
+            <Text style={styles.statLabel}>Projects</Text>
+          </View>
+          <View style={styles.statCard}>
+            <IconSymbol
+              ios_icon_name="photo.stack.fill"
+              android_material_icon_name="collections"
+              size={28}
+              color={colors.primaryDark}
+            />
+            <Text style={styles.statNumber}>-</Text>
+            <Text style={styles.statLabel}>Images</Text>
+          </View>
+          <View style={styles.statCard}>
+            <IconSymbol
+              ios_icon_name="cube.fill"
+              android_material_icon_name="view_in_ar"
+              size={28}
+              color={colors.primary}
+            />
+            <Text style={styles.statNumber}>-</Text>
+            <Text style={styles.statLabel}>Models</Text>
+          </View>
+        </View>
+
+        {/* Main Features */}
         <View style={styles.featuresContainer}>
+          <Text style={styles.sectionTitle}>Project Management</Text>
+          
           <FeatureCard
-            icon="wand.and.stars"
-            androidIcon="auto_fix_high"
-            title="Generate Images"
-            description="Create images from text descriptions"
+            icon="folder.badge.plus"
+            androidIcon="create_new_folder"
+            title="Create Project"
+            description="Start a new mapping project"
+            onPress={() => {
+              Alert.alert("Create Project", "Project creation feature coming soon!");
+            }}
+            color={colors.primary}
+          />
+
+          <FeatureCard
+            icon="folder.fill"
+            androidIcon="folder_open"
+            title="My Projects"
+            description="View and manage your projects"
+            onPress={() => {
+              Alert.alert("My Projects", "Projects list feature coming soon!");
+            }}
+            color={colors.primaryDark}
+          />
+
+          <Text style={styles.sectionTitle}>Drone Operations</Text>
+
+          <FeatureCard
+            icon="airplane"
+            androidIcon="flight"
+            title="Flight Planning"
+            description="Plan autonomous drone missions"
+            onPress={() => {
+              Alert.alert("Flight Planning", "Flight planning feature coming soon!");
+            }}
+            color={colors.primary}
+          />
+
+          <FeatureCard
+            icon="antenna.radiowaves.left.and.right"
+            androidIcon="settings_remote"
+            title="Drone Control"
+            description="Connect and control your DJI drone"
+            onPress={() => {
+              Alert.alert("Drone Control", "Drone control feature coming soon!");
+            }}
+            color={colors.primaryDark}
+          />
+
+          <Text style={styles.sectionTitle}>Processing & Analysis</Text>
+
+          <FeatureCard
+            icon="map.fill"
+            androidIcon="map"
+            title="Generate Maps"
+            description="Create topographic maps from imagery"
             onPress={() => router.push("/generate")}
             color={colors.primary}
           />
 
           <FeatureCard
-            icon="photo.on.rectangle.angled"
-            androidIcon="edit"
-            title="Edit Images"
-            description="Enhance and modify your photos"
-            onPress={() => router.push("/edit")}
+            icon="cube.transparent"
+            androidIcon="view_in_ar"
+            title="3D Processing"
+            description="Process images into 3D models"
+            onPress={() => {
+              Alert.alert("3D Processing", "3D processing feature coming soon!");
+            }}
             color={colors.primaryDark}
           />
 
           <FeatureCard
             icon="photo.stack"
             androidIcon="collections"
-            title="Gallery"
-            description="View your created images"
+            title="Media Gallery"
+            description="View project images and models"
             onPress={() => router.push("/gallery")}
+            color={colors.primary}
+          />
+
+          <Text style={styles.sectionTitle}>Tools</Text>
+
+          <FeatureCard
+            icon="chart.line.uptrend.xyaxis"
+            androidIcon="terrain"
+            title="Elevation Data"
+            description="Get terrain elevation information"
+            onPress={() => {
+              Alert.alert("Elevation Data", "Elevation data feature coming soon!");
+            }}
+            color={colors.primaryDark}
+          />
+
+          <FeatureCard
+            icon="photo.on.rectangle.angled"
+            androidIcon="edit"
+            title="Image Editor"
+            description="Edit and enhance your images"
+            onPress={() => router.push("/edit")}
             color={colors.primary}
           />
         </View>
@@ -456,7 +584,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 24,
   },
   welcomeTitle: {
     fontSize: 32,
@@ -470,8 +598,41 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 32,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: colors.surface + 'CC',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  statNumber: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.textPrimary,
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginTop: 16,
+    marginBottom: 12,
+  },
   featuresContainer: {
-    gap: 16,
+    gap: 12,
   },
   featureCard: {
     backgroundColor: colors.surface + 'CC',
