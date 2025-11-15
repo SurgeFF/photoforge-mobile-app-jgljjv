@@ -306,9 +306,7 @@ export default function HomeScreen() {
             androidIcon="create_new_folder"
             title="Create Project"
             description="Start a new mapping project"
-            onPress={() => {
-              Alert.alert("Create Project", "Project creation feature coming soon!");
-            }}
+            onPress={() => router.push("/new-project")}
             color={colors.primary}
           />
 
@@ -317,9 +315,7 @@ export default function HomeScreen() {
             androidIcon="folder_open"
             title="My Projects"
             description="View and manage your projects"
-            onPress={() => {
-              Alert.alert("My Projects", "Projects list feature coming soon!");
-            }}
+            onPress={() => router.push("/projects")}
             color={colors.primaryDark}
           />
 
@@ -331,7 +327,14 @@ export default function HomeScreen() {
             title="Flight Planning"
             description="Plan autonomous drone missions"
             onPress={() => {
-              Alert.alert("Flight Planning", "Flight planning feature coming soon!");
+              Alert.alert(
+                "Flight Planning",
+                "Please select a project first",
+                [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Go to Projects", onPress: () => router.push("/projects") },
+                ]
+              );
             }}
             color={colors.primary}
           />
@@ -341,9 +344,7 @@ export default function HomeScreen() {
             androidIcon="settings_remote"
             title="Drone Control"
             description="Connect and control your DJI drone"
-            onPress={() => {
-              Alert.alert("Drone Control", "Drone control feature coming soon!");
-            }}
+            onPress={() => router.push("/drone-control")}
             color={colors.primaryDark}
           />
 
@@ -378,17 +379,24 @@ export default function HomeScreen() {
             color={colors.primary}
           />
 
-          <Text style={styles.sectionTitle}>Tools</Text>
+          <Text style={styles.sectionTitle}>Account & Settings</Text>
 
           <FeatureCard
-            icon="chart.line.uptrend.xyaxis"
-            androidIcon="terrain"
-            title="Elevation Data"
-            description="Get terrain elevation information"
-            onPress={() => {
-              Alert.alert("Elevation Data", "Elevation data feature coming soon!");
-            }}
+            icon="creditcard.fill"
+            androidIcon="payment"
+            title="Subscription"
+            description="Manage your subscription plan"
+            onPress={() => router.push("/subscription")}
             color={colors.primaryDark}
+          />
+
+          <FeatureCard
+            icon="questionmark.circle.fill"
+            androidIcon="help"
+            title="Support"
+            description="Get help and submit tickets"
+            onPress={() => router.push("/support")}
+            color={colors.primary}
           />
 
           <FeatureCard
@@ -397,7 +405,7 @@ export default function HomeScreen() {
             title="Image Editor"
             description="Edit and enhance your images"
             onPress={() => router.push("/edit")}
-            color={colors.primary}
+            color={colors.primaryDark}
           />
         </View>
 
