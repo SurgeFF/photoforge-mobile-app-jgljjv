@@ -134,7 +134,11 @@ export default function FlightPlanningScreen() {
     if (!drawnArea) {
       Alert.alert(
         "No Area Defined",
-        "Please draw a polygon on the map to define the flight area, or use manual coordinates."
+        "Please draw a polygon on the map to define the flight area. Use the drawing tools on the map to create a boundary.",
+        [
+          { text: "Use Demo Area", onPress: () => generatePlan() },
+          { text: "Cancel", style: "cancel" },
+        ]
       );
       return;
     }
@@ -159,6 +163,13 @@ export default function FlightPlanningScreen() {
     setIsGenerating(true);
 
     try {
+      console.log("🛫 Generating flight plan with parameters:", {
+        altitude: parseInt(altitude),
+        overlap: parseInt(overlap),
+        speed: parseInt(speed),
+        gimbalAngle: parseInt(gimbalAngle),
+      });
+
       const result = await generateFlightPlan({
         area: drawnArea || {
           type: "Polygon",
@@ -185,36 +196,46 @@ export default function FlightPlanningScreen() {
         },
       });
 
-      if (result.success && result.data) {
-        setFlightPlanData(result.data);
-        
-        // Send waypoints to map for visualization
-        if (webViewRef.current && result.data.waypoints) {
-          const waypointsJS = JSON.stringify(result.data.waypoints);
-          webViewRef.current.injectJavaScript(`
-            if (typeof displayWaypoints === 'function') {
-              displayWaypoints(${waypointsJS});
-            }
-            true;
-          `);
-        }
+      console.log("📊 Flight plan result:", result);
 
-        Alert.alert(
-          "Success",
-          `Flight plan generated!\n\n${result.data.metadata.total_waypoints} waypoints\n${result.data.metadata.estimated_photos} photos\n${result.data.metadata.estimated_flight_time_minutes.toFixed(1)} minutes\n${result.data.metadata.total_distance_km.toFixed(2)} km`,
-          [
-            {
-              text: "Upload to Drone",
-              onPress: () => handleUploadToDrone(),
-            },
-            { text: "OK" },
-          ]
-        );
+      if (result.success) {
+        // Handle different response formats from backend
+        const planData = result.data?.data || result.data;
+        
+        if (planData && planData.waypoints && planData.metadata) {
+          setFlightPlanData(planData);
+          
+          // Send waypoints to map for visualization
+          if (webViewRef.current && planData.waypoints) {
+            const waypointsJS = JSON.stringify(planData.waypoints);
+            webViewRef.current.injectJavaScript(`
+              if (typeof displayWaypoints === 'function') {
+                displayWaypoints(${waypointsJS});
+              }
+              true;
+            `);
+          }
+
+          Alert.alert(
+            "Success",
+            `Flight plan generated!\n\n${planData.metadata.total_waypoints} waypoints\n${planData.metadata.estimated_photos} photos\n${planData.metadata.estimated_flight_time_minutes.toFixed(1)} minutes\n${planData.metadata.total_distance_km.toFixed(2)} km`,
+            [
+              {
+                text: "Upload to Drone",
+                onPress: () => handleUploadToDrone(),
+              },
+              { text: "OK" },
+            ]
+          );
+        } else {
+          console.error("❌ Invalid flight plan data structure:", planData);
+          Alert.alert("Error", "Invalid flight plan data received from server");
+        }
       } else {
         Alert.alert("Error", result.error || "Failed to generate flight plan");
       }
     } catch (error) {
-      console.error("Generate flight plan error:", error);
+      console.error("❌ Generate flight plan error:", error);
       Alert.alert("Error", "Failed to generate flight plan. Please try again.");
     } finally {
       setIsGenerating(false);
@@ -252,7 +273,7 @@ export default function FlightPlanningScreen() {
         Alert.alert("Error", result.error || "Failed to upload flight plan");
       }
     } catch (error) {
-      console.error("Upload flight plan error:", error);
+      console.error("❌ Upload flight plan error:", error);
       Alert.alert("Error", "Failed to upload flight plan to drone");
     } finally {
       setIsUploading(false);
@@ -265,9 +286,21 @@ export default function FlightPlanningScreen() {
       return;
     }
 
+    // For now, just show the data in an alert
+    // In a real implementation, this would download the file
+    let exportData = "";
+    
+    if (format === "json") {
+      exportData = JSON.stringify(flightPlanData, null, 2);
+    } else if (format === "kml") {
+      exportData = "KML export coming soon...";
+    } else if (format === "csv") {
+      exportData = "CSV export coming soon...";
+    }
+
     Alert.alert(
-      "Export",
-      `Export functionality for ${format.toUpperCase()} will be available in a future update.`,
+      `Export ${format.toUpperCase()}`,
+      `Export functionality will be available in a future update.\n\nFor now, here's a preview:\n${exportData.substring(0, 200)}...`,
       [{ text: "OK" }]
     );
   };
@@ -278,12 +311,13 @@ export default function FlightPlanningScreen() {
       
       if (data.type === "area_drawn") {
         setDrawnArea(data.area);
-        console.log("Area drawn:", data.area);
+        console.log("✅ Area drawn:", data.area);
+        Alert.alert("Area Defined", "Flight area has been defined. You can now generate the flight plan.");
       } else if (data.type === "map_ready") {
-        console.log("Map is ready");
+        console.log("✅ Map is ready");
       }
     } catch (error) {
-      console.error("Error parsing WebView message:", error);
+      console.error("❌ Error parsing WebView message:", error);
     }
   };
 
@@ -411,6 +445,9 @@ export default function FlightPlanningScreen() {
             color={colors.primary}
           />
           <Text style={styles.projectName}>{projectName || "Flight Plan"}</Text>
+          <Text style={styles.subtitle}>
+            Automated drone flight path generation for mapping missions
+          </Text>
         </View>
 
         {/* Interactive Map */}
@@ -434,7 +471,7 @@ export default function FlightPlanningScreen() {
             />
           </View>
           <Text style={styles.mapHelpText}>
-            Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
+            📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
           </Text>
         </View>
 
@@ -486,6 +523,8 @@ export default function FlightPlanningScreen() {
                 value={altitude}
                 onChangeText={setAltitude}
                 keyboardType="numeric"
+                placeholder="120"
+                placeholderTextColor={colors.textSecondary}
               />
               <Text style={styles.sliderLabel}>150m</Text>
             </View>
@@ -506,6 +545,8 @@ export default function FlightPlanningScreen() {
                 value={overlap}
                 onChangeText={setOverlap}
                 keyboardType="numeric"
+                placeholder="70"
+                placeholderTextColor={colors.textSecondary}
               />
               <Text style={styles.sliderLabel}>85%</Text>
             </View>
@@ -526,6 +567,8 @@ export default function FlightPlanningScreen() {
                 value={speed}
                 onChangeText={setSpeed}
                 keyboardType="numeric"
+                placeholder="10"
+                placeholderTextColor={colors.textSecondary}
               />
               <Text style={styles.sliderLabel}>15</Text>
             </View>
@@ -546,6 +589,8 @@ export default function FlightPlanningScreen() {
                 value={gimbalAngle}
                 onChangeText={setGimbalAngle}
                 keyboardType="numeric"
+                placeholder="-90"
+                placeholderTextColor={colors.textSecondary}
               />
               <Text style={styles.sliderLabel}>-45°</Text>
             </View>
@@ -579,6 +624,8 @@ export default function FlightPlanningScreen() {
                   value={sensorWidth}
                   onChangeText={setSensorWidth}
                   keyboardType="numeric"
+                  placeholder="13.2"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
               <View style={styles.inputGroupHalf}>
@@ -588,6 +635,8 @@ export default function FlightPlanningScreen() {
                   value={sensorHeight}
                   onChangeText={setSensorHeight}
                   keyboardType="numeric"
+                  placeholder="8.8"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
             </View>
@@ -600,6 +649,8 @@ export default function FlightPlanningScreen() {
                   value={focalLength}
                   onChangeText={setFocalLength}
                   keyboardType="numeric"
+                  placeholder="8.8"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
               <View style={styles.inputGroupHalf}>
@@ -609,6 +660,8 @@ export default function FlightPlanningScreen() {
                   value={imageWidth}
                   onChangeText={setImageWidth}
                   keyboardType="numeric"
+                  placeholder="5472"
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
             </View>
@@ -620,6 +673,8 @@ export default function FlightPlanningScreen() {
                 value={imageHeight}
                 onChangeText={setImageHeight}
                 keyboardType="numeric"
+                placeholder="3648"
+                placeholderTextColor={colors.textSecondary}
               />
             </View>
           </View>
@@ -877,6 +932,13 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginTop: 12,
     textAlign: "center",
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 8,
+    textAlign: "center",
+    paddingHorizontal: 20,
   },
   mapContainer: {
     marginBottom: 24,
