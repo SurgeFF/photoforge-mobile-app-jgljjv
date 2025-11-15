@@ -42,6 +42,50 @@ export interface DroneInfo {
   gps_signal: number;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  location?: string;
+  status: string;
+  created_date: string;
+  updated_at?: string;
+  [key: string]: any;
+}
+
+export interface MediaFile {
+  id: string;
+  project_id: string;
+  file_url: string;
+  file_name: string;
+  file_type: string;
+  metadata?: {
+    latitude?: number;
+    longitude?: number;
+    altitude?: number;
+    [key: string]: any;
+  };
+  created_at?: string;
+  [key: string]: any;
+}
+
+export interface ProcessedModel {
+  id: string;
+  project_id: string;
+  model_type: string;
+  status: string;
+  output_url?: string;
+  thumbnail_url?: string;
+  file_size?: number;
+  created_at?: string;
+  [key: string]: any;
+}
+
+export interface ProjectDetail {
+  project: Project;
+  media_files: MediaFile[];
+  models: ProcessedModel[];
+}
+
 export async function getAccessKey(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
@@ -179,11 +223,106 @@ export async function generateMobileAccessKey(): Promise<ApiResponse<any>> {
 // ==================== PROJECT MANAGEMENT ====================
 
 /**
- * Get projects with authenticated access key
+ * Get all projects for authenticated mobile user
+ * Uses the new mobile-specific endpoint that returns all project data
+ */
+export async function getProjectsMobile(accessKey: string): Promise<ApiResponse<Project[]>> {
+  try {
+    console.log("\n========== FETCHING PROJECTS (MOBILE) ==========");
+    console.log("📂 Fetching all projects for mobile user...");
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/getProjectsMobile`);
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/getProjectsMobile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ access_key: accessKey }),
+    });
+
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response data:", JSON.stringify(data).substring(0, 200) + "...");
+    
+    if (response.ok && data.success) {
+      const projects = data.data || [];
+      console.log("✅ Projects loaded successfully:", projects.length, "projects");
+      console.log("========== FETCH PROJECTS SUCCESS ==========\n");
+      return { success: true, data: projects };
+    } else {
+      const errorMsg = data.error || "Failed to load projects";
+      console.log("❌ Failed to load projects:", errorMsg);
+      console.log("========== FETCH PROJECTS FAILED ==========\n");
+      return { success: false, error: errorMsg };
+    }
+  } catch (error) {
+    console.error("❌ EXCEPTION during getProjectsMobile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Get single project with media files and processed models
+ * Uses the new mobile-specific endpoint that returns complete project details
+ */
+export async function getProjectDetailMobile(accessKey: string, projectId: string): Promise<ApiResponse<ProjectDetail>> {
+  try {
+    console.log("\n========== FETCHING PROJECT DETAIL (MOBILE) ==========");
+    console.log("📂 Fetching project detail for mobile user...");
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/getProjectDetailMobile`);
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
+    console.log("🆔 Project ID:", projectId);
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/getProjectDetailMobile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ 
+        access_key: accessKey,
+        project_id: projectId 
+      }),
+    });
+
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response data:", JSON.stringify(data).substring(0, 200) + "...");
+    
+    if (response.ok && data.success) {
+      const projectDetail = data.data;
+      console.log("✅ Project detail loaded successfully");
+      console.log("   - Project:", projectDetail.project?.name || "Unknown");
+      console.log("   - Media files:", projectDetail.media_files?.length || 0);
+      console.log("   - Models:", projectDetail.models?.length || 0);
+      console.log("========== FETCH PROJECT DETAIL SUCCESS ==========\n");
+      return { success: true, data: projectDetail };
+    } else {
+      const errorMsg = data.error || "Failed to load project detail";
+      console.log("❌ Failed to load project detail:", errorMsg);
+      console.log("========== FETCH PROJECT DETAIL FAILED ==========\n");
+      return { success: false, error: errorMsg };
+    }
+  } catch (error) {
+    console.error("❌ EXCEPTION during getProjectDetailMobile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Get projects with authenticated access key (legacy method)
  */
 export async function getProjects(accessKey: string): Promise<ApiResponse<any[]>> {
   try {
-    console.log("📂 Fetching projects...");
+    console.log("📂 Fetching projects (legacy)...");
     
     const response = await fetch(`${ENTITIES_BASE}/Project`, {
       method: "GET",
@@ -211,7 +350,7 @@ export async function getProjects(accessKey: string): Promise<ApiResponse<any[]>
 }
 
 /**
- * Get a specific project by ID
+ * Get a specific project by ID (legacy method)
  */
 export async function getProjectById(accessKey: string, projectId: string): Promise<ApiResponse<any>> {
   try {
@@ -278,7 +417,7 @@ export async function createProject(accessKey: string, project: any): Promise<Ap
 }
 
 /**
- * Get media files for a project
+ * Get media files for a project (legacy method)
  */
 export async function getMediaFiles(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
   try {
@@ -308,7 +447,7 @@ export async function getMediaFiles(accessKey: string, projectId: string): Promi
 }
 
 /**
- * Get processed models for a project
+ * Get processed models for a project (legacy method)
  */
 export async function getProcessedModels(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
   try {
