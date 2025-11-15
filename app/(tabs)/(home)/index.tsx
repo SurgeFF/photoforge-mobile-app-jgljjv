@@ -17,6 +17,7 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
+import { validateAccessKey } from "@/utils/apiClient";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
@@ -27,6 +28,7 @@ export default function HomeScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isValidating, setIsValidating] = useState(false);
   const [error, setError] = useState("");
+  const [userName, setUserName] = useState("");
 
   useEffect(() => {
     checkStoredAccessKey();
@@ -35,11 +37,16 @@ export default function HomeScreen() {
   const checkStoredAccessKey = async () => {
     try {
       const storedKey = await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
+      const storedUser = await AsyncStorage.getItem("@photoforge_user_name");
+      
       console.log("[HomeScreen] Checking stored access key...");
       if (storedKey) {
         console.log("[HomeScreen] Found stored access key, length:", storedKey.length);
         setAccessKey(storedKey);
         setIsAuthenticated(true);
+        if (storedUser) {
+          setUserName(storedUser);
+        }
       } else {
         console.log("[HomeScreen] No stored access key found");
       }
@@ -60,72 +67,29 @@ export default function HomeScreen() {
     setError("");
 
     try {
-      console.log("\n========== ACCESS KEY VALIDATION ==========");
-      console.log("[Validation] Starting validation process...");
-      console.log("[Validation] API Endpoint: https://photoforge.base44.app/api/validate-key");
-      console.log("[Validation] Access key (first 10 chars):", accessKey.trim().substring(0, 10) + "...");
-      console.log("[Validation] Access key length:", accessKey.trim().length);
-      console.log("[Validation] Timestamp:", new Date().toISOString());
-      
-      const requestBody = { accessKey: accessKey.trim() };
-      console.log("[Validation] Request body:", JSON.stringify(requestBody));
-      
-      const response = await fetch("https://photoforge.base44.app/api/validate-key", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
+      const result = await validateAccessKey(accessKey.trim());
 
-      console.log("[Validation] Response received");
-      console.log("[Validation] Response status:", response.status);
-      console.log("[Validation] Response ok:", response.ok);
-      console.log("[Validation] Response status text:", response.statusText);
-      
-      const responseText = await response.text();
-      console.log("[Validation] Response body (raw):", responseText);
-
-      let data;
-      try {
-        data = JSON.parse(responseText);
-        console.log("[Validation] Parsed response data:", JSON.stringify(data, null, 2));
-      } catch (parseError) {
-        console.error("[Validation] JSON parse error:", parseError);
-        console.error("[Validation] Failed to parse response as JSON");
-        console.error("[Validation] Raw response:", responseText.substring(0, 200));
-        setError(`Server error: Invalid response format`);
-        console.log("========== VALIDATION FAILED ==========\n");
-        return;
-      }
-
-      if (response.ok && data.isValid) {
-        console.log("[Validation] ✅ Access key is VALID");
+      if (result.success && result.data) {
+        console.log("[HomeScreen] ✅ Login successful");
         await AsyncStorage.setItem(ACCESS_KEY_STORAGE, accessKey.trim());
-        console.log("[Validation] Access key stored successfully");
+        await AsyncStorage.setItem("@photoforge_user_name", result.data.full_name || result.data.email);
         setIsAuthenticated(true);
-        console.log("========== VALIDATION SUCCESS ==========\n");
+        setUserName(result.data.full_name || result.data.email);
       } else {
-        const errorMsg = data.message || data.error || "Invalid access key. Please check and try again.";
-        console.log("[Validation] ❌ Access key is INVALID");
-        console.log("[Validation] Error message:", errorMsg);
-        console.log("[Validation] Full error data:", JSON.stringify(data, null, 2));
+        const errorMsg = result.error || "Invalid access key. Please check and try again.";
+        console.log("[HomeScreen] ❌ Login failed:", errorMsg);
         setError(errorMsg);
         
         if (__DEV__) {
           Alert.alert(
             "Validation Failed",
-            `Status: ${response.status}\nMessage: ${errorMsg}\n\nCheck console for detailed logs.`,
+            `Error: ${errorMsg}\n\nCheck console for detailed logs.`,
             [{ text: "OK" }]
           );
         }
-        console.log("========== VALIDATION FAILED ==========\n");
       }
     } catch (error) {
-      console.error("[Validation] ❌ EXCEPTION occurred during validation");
-      console.error("[Validation] Error type:", error?.constructor?.name);
-      console.error("[Validation] Error message:", error instanceof Error ? error.message : "Unknown error");
-      console.error("[Validation] Error stack:", error instanceof Error ? error.stack : "No stack trace");
+      console.error("[HomeScreen] ❌ Exception during login:", error);
       
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       setError(`Unable to validate: ${errorMessage}`);
@@ -137,7 +101,6 @@ export default function HomeScreen() {
           [{ text: "OK" }]
         );
       }
-      console.log("========== VALIDATION ERROR ==========\n");
     } finally {
       setIsValidating(false);
     }
@@ -155,8 +118,10 @@ export default function HomeScreen() {
           onPress: async () => {
             console.log("[HomeScreen] Logging out...");
             await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
+            await AsyncStorage.removeItem("@photoforge_user_name");
             setIsAuthenticated(false);
             setAccessKey("");
+            setUserName("");
             console.log("[HomeScreen] Logged out successfully");
           },
         },
@@ -275,7 +240,9 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.welcomeTitle}>PhotoForge Studio</Text>
-          <Text style={styles.welcomeSubtitle}>Create stunning AI-powered images</Text>
+          <Text style={styles.welcomeSubtitle}>
+            {userName ? `Welcome back, ${userName}` : "Create stunning AI-powered images"}
+          </Text>
         </View>
 
         <View style={styles.featuresContainer}>

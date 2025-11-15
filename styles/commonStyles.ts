@@ -1,131 +1,133 @@
 
-import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import { StyleSheet } from 'react-native';
 
-// PhotoForge color palette - matching the webapp design
+// PhotoForge Color Palette
 export const colors = {
+  // Primary Colors
   primary: '#c87941',           // Main brand color, buttons, highlights
   primaryDark: '#8b5a2b',       // Darker shade for gradients
+  
+  // Background Colors
   backgroundLight: '#f5f1e8',   // Main background color
   backgroundWarm: '#d4c4a8',    // Navigation, cards, elevated surfaces
+  
+  // Accent & Borders
   accentBorder: '#c4a574',      // Borders, dividers
+  
+  // Text Colors
   textPrimary: '#3d2f20',       // Primary text color
   textSecondary: '#6b5544',     // Secondary text, labels
-  surface: '#ffffff',           // Cards, inputs (80% opacity with backdrop blur)
   
-  // Legacy aliases for compatibility
-  background: '#f5f1e8',
-  text: '#3d2f20',
-  grey: '#6b5544',
-  card: '#d4c4a8',
-  border: '#c4a574',
-  success: '#10b981',
-  error: '#ef4444',
-  warning: '#f59e0b',
+  // Surface
+  surface: '#ffffff',           // Cards, inputs (use with 80% opacity + backdrop blur)
+  
+  // Additional UI Colors
+  error: '#d32f2f',             // Error messages
+  success: '#388e3c',           // Success messages
+  warning: '#f57c00',           // Warning messages
+  info: '#1976d2',              // Info messages
 };
 
-export const typography = {
+// Typography Styles
+export const typography = StyleSheet.create({
   headingLarge: {
     fontSize: 24,
-    fontWeight: '700' as const,
+    fontWeight: '700',
     color: colors.textPrimary,
   },
   headingMedium: {
     fontSize: 18,
-    fontWeight: '600' as const,
+    fontWeight: '600',
     color: colors.textPrimary,
   },
   body: {
     fontSize: 16,
-    fontWeight: '400' as const,
+    fontWeight: '400',
     color: colors.textPrimary,
   },
   bodySmall: {
     fontSize: 14,
-    fontWeight: '400' as const,
+    fontWeight: '400',
     color: colors.textSecondary,
   },
   caption: {
     fontSize: 12,
-    fontWeight: '400' as const,
+    fontWeight: '400',
     color: colors.textSecondary,
-  },
-};
-
-export const buttonStyles = StyleSheet.create({
-  primary: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  primaryText: {
-    color: colors.surface,
-    fontSize: 16,
-    fontWeight: '600' as const,
   },
 });
 
+// Common Component Styles
 export const commonStyles = StyleSheet.create({
-  wrapper: {
-    backgroundColor: colors.backgroundLight,
-    width: '100%',
-    height: '100%',
+  // Card Style
+  card: {
+    backgroundColor: colors.surface + 'CC', // 80% opacity
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    borderRadius: 12,
+    padding: 16,
   },
+  
+  // Button Styles
+  primaryButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  primaryButtonText: {
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  
+  // Navigation Bar Style
+  navigationBar: {
+    backgroundColor: colors.backgroundWarm + 'F2', // 95% opacity
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  
+  // Input Style
+  input: {
+    backgroundColor: colors.surface + 'CC',
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  
+  // Shadow/Elevation
+  shadow: {
+    shadowColor: colors.textPrimary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  
+  // Container
   container: {
     flex: 1,
     backgroundColor: colors.backgroundLight,
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    maxWidth: 800,
-    width: '100%',
-  },
-  title: {
-    ...typography.headingLarge,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  text: {
-    ...typography.body,
-    marginBottom: 8,
-    lineHeight: 24,
-    textAlign: 'center',
-  },
-  section: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  card: {
-    backgroundColor: colors.surface + 'CC', // 80% opacity
-    borderColor: colors.accentBorder,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    marginVertical: 8,
-    width: '100%',
-    boxShadow: '0px 4px 12px rgba(61, 47, 32, 0.15)',
-    elevation: 4,
-  },
-  icon: {
-    width: 60,
-    height: 60,
-    tintColor: colors.primary,
-  },
-  navBar: {
-    backgroundColor: colors.backgroundWarm + 'F2', // 95% opacity
-    borderColor: colors.accentBorder,
-    borderWidth: 1,
+  
+  // Content Padding
+  contentPadding: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
 });
+
+// Gradient Colors (for use with LinearGradient)
+export const gradients = {
+  primary: [colors.primary, colors.primaryDark],
+  background: [colors.backgroundLight, colors.backgroundWarm],
+};
