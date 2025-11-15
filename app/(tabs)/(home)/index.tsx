@@ -56,6 +56,9 @@ export default function HomeScreen() {
     setError("");
 
     try {
+      console.log("Starting validation...");
+      console.log("Access key:", accessKey.trim().substring(0, 10) + "...");
+      
       // Validate the access key with PhotoForge backend
       const response = await fetch("https://photoforge.base44.app/api/validate-key", {
         method: "POST",
@@ -65,7 +68,21 @@ export default function HomeScreen() {
         body: JSON.stringify({ accessKey: accessKey.trim() }),
       });
 
-      const data = await response.json();
+      console.log("Response status:", response.status);
+      console.log("Response headers:", JSON.stringify(response.headers));
+      
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("Parsed data:", data);
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        setError(`Server error: ${responseText.substring(0, 100)}`);
+        return;
+      }
 
       if (response.ok && data.isValid) {
         // Store the access key securely
@@ -73,11 +90,32 @@ export default function HomeScreen() {
         setIsAuthenticated(true);
         console.log("Access key validated successfully");
       } else {
-        setError(data.message || "Invalid access key. Please check and try again.");
+        const errorMsg = data.message || data.error || "Invalid access key. Please check and try again.";
+        console.log("Validation failed:", errorMsg);
+        setError(errorMsg);
+        
+        // Show detailed error in development
+        if (__DEV__) {
+          Alert.alert(
+            "Validation Failed",
+            `Status: ${response.status}\nMessage: ${errorMsg}\n\nCheck console for more details.`,
+            [{ text: "OK" }]
+          );
+        }
       }
     } catch (error) {
       console.error("Validation error:", error);
-      setError("Unable to validate access key. Please check your internet connection.");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      setError(`Unable to validate: ${errorMessage}`);
+      
+      // Show detailed error in development
+      if (__DEV__) {
+        Alert.alert(
+          "Network Error",
+          `Error: ${errorMessage}\n\nMake sure you have internet connection and the server is accessible.`,
+          [{ text: "OK" }]
+        );
+      }
     } finally {
       setIsValidating(false);
     }
@@ -150,7 +188,17 @@ export default function HomeScreen() {
               autoCorrect={false}
               secureTextEntry
             />
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {error ? (
+              <View style={styles.errorContainer}>
+                <IconSymbol
+                  ios_icon_name="exclamationmark.triangle.fill"
+                  android_material_icon_name="error"
+                  size={16}
+                  color="#FF3B30"
+                />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            ) : null}
 
             <Button
               onPress={handleLogin}
@@ -172,6 +220,14 @@ export default function HomeScreen() {
                 Get your access key from PhotoForge.base44.app
               </Text>
             </View>
+            
+            {__DEV__ && (
+              <View style={styles.debugContainer}>
+                <Text style={styles.debugText}>
+                  Debug Mode: Check console logs for detailed error information
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -321,10 +377,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 2,
   },
+  errorContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 8,
+  },
   errorText: {
     color: "#FF3B30",
     fontSize: 14,
-    marginTop: 8,
+    flex: 1,
   },
   loginButton: {
     marginTop: 24,
@@ -343,6 +405,18 @@ const styles = StyleSheet.create({
     color: colors.grey,
     marginLeft: 12,
     flex: 1,
+  },
+  debugContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: "#FFF3CD",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#FFC107",
+  },
+  debugText: {
+    fontSize: 12,
+    color: "#856404",
   },
   header: {
     alignItems: "center",

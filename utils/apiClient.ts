@@ -48,8 +48,12 @@ export async function getAccessKey(): Promise<string | null> {
   }
 }
 
-export async function validateAccessKey(accessKey: string): Promise<{ isValid: boolean; message?: string }> {
+export async function validateAccessKey(accessKey: string): Promise<{ isValid: boolean; message?: string; error?: string }> {
   try {
+    console.log("Validating access key...");
+    console.log("API URL:", `${API_BASE_URL}/validate-key`);
+    console.log("Access key length:", accessKey.length);
+    
     const response = await fetch(`${API_BASE_URL}/validate-key`, {
       method: "POST",
       headers: {
@@ -58,19 +62,46 @@ export async function validateAccessKey(accessKey: string): Promise<{ isValid: b
       body: JSON.stringify({ accessKey }),
     });
 
-    return await response.json();
+    console.log("Response status:", response.status);
+    console.log("Response ok:", response.ok);
+    
+    const responseText = await response.text();
+    console.log("Response text:", responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log("Parsed response data:", data);
+    } catch (parseError) {
+      console.error("Failed to parse response as JSON:", parseError);
+      return { 
+        isValid: false, 
+        message: "Invalid server response",
+        error: `Server returned: ${responseText.substring(0, 100)}`
+      };
+    }
+
+    return data;
   } catch (error) {
     console.error("Validation error:", error);
-    return { isValid: false, message: "Network error" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { 
+      isValid: false, 
+      message: "Network error",
+      error: errorMessage
+    };
   }
 }
 
-export async function generateImage(prompt: string, negativePrompt?: string): Promise<{ imageUrl?: string; message?: string }> {
+export async function generateImage(prompt: string, negativePrompt?: string): Promise<{ imageUrl?: string; message?: string; error?: string }> {
   try {
     const accessKey = await getAccessKey();
     if (!accessKey) {
       return { message: "Not authenticated" };
     }
+
+    console.log("Generating image with prompt:", prompt);
+    console.log("API URL:", `${API_BASE_URL}/generate`);
 
     const response = await fetch(`${API_BASE_URL}/generate`, {
       method: "POST",
@@ -81,19 +112,42 @@ export async function generateImage(prompt: string, negativePrompt?: string): Pr
       body: JSON.stringify({ prompt, negativePrompt }),
     });
 
-    return await response.json();
+    console.log("Generate response status:", response.status);
+    
+    const responseText = await response.text();
+    console.log("Generate response:", responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse generate response:", parseError);
+      return { 
+        message: "Invalid server response",
+        error: `Server returned: ${responseText.substring(0, 100)}`
+      };
+    }
+
+    return data;
   } catch (error) {
     console.error("Generation error:", error);
-    return { message: "Network error" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { 
+      message: "Network error",
+      error: errorMessage
+    };
   }
 }
 
-export async function enhanceImage(imageUri: string): Promise<{ imageUrl?: string; message?: string }> {
+export async function enhanceImage(imageUri: string): Promise<{ imageUrl?: string; message?: string; error?: string }> {
   try {
     const accessKey = await getAccessKey();
     if (!accessKey) {
       return { message: "Not authenticated" };
     }
+
+    console.log("Enhancing image:", imageUri);
+    console.log("API URL:", `${API_BASE_URL}/enhance`);
 
     const formData = new FormData();
     formData.append("image", {
@@ -110,19 +164,42 @@ export async function enhanceImage(imageUri: string): Promise<{ imageUrl?: strin
       body: formData,
     });
 
-    return await response.json();
+    console.log("Enhance response status:", response.status);
+    
+    const responseText = await response.text();
+    console.log("Enhance response:", responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse enhance response:", parseError);
+      return { 
+        message: "Invalid server response",
+        error: `Server returned: ${responseText.substring(0, 100)}`
+      };
+    }
+
+    return data;
   } catch (error) {
     console.error("Enhancement error:", error);
-    return { message: "Network error" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { 
+      message: "Network error",
+      error: errorMessage
+    };
   }
 }
 
-export async function getGallery(): Promise<{ images?: Array<any>; message?: string }> {
+export async function getGallery(): Promise<{ images?: Array<any>; message?: string; error?: string }> {
   try {
     const accessKey = await getAccessKey();
     if (!accessKey) {
       return { message: "Not authenticated" };
     }
+
+    console.log("Fetching gallery...");
+    console.log("API URL:", `${API_BASE_URL}/gallery`);
 
     const response = await fetch(`${API_BASE_URL}/gallery`, {
       method: "GET",
@@ -131,19 +208,42 @@ export async function getGallery(): Promise<{ images?: Array<any>; message?: str
       },
     });
 
-    return await response.json();
+    console.log("Gallery response status:", response.status);
+    
+    const responseText = await response.text();
+    console.log("Gallery response:", responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse gallery response:", parseError);
+      return { 
+        message: "Invalid server response",
+        error: `Server returned: ${responseText.substring(0, 100)}`
+      };
+    }
+
+    return data;
   } catch (error) {
     console.error("Gallery error:", error);
-    return { message: "Network error" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { 
+      message: "Network error",
+      error: errorMessage
+    };
   }
 }
 
-export async function deleteImage(imageId: string): Promise<{ success?: boolean; message?: string }> {
+export async function deleteImage(imageId: string): Promise<{ success?: boolean; message?: string; error?: string }> {
   try {
     const accessKey = await getAccessKey();
     if (!accessKey) {
       return { message: "Not authenticated" };
     }
+
+    console.log("Deleting image:", imageId);
+    console.log("API URL:", `${API_BASE_URL}/gallery/${imageId}`);
 
     const response = await fetch(`${API_BASE_URL}/gallery/${imageId}`, {
       method: "DELETE",
@@ -152,9 +252,29 @@ export async function deleteImage(imageId: string): Promise<{ success?: boolean;
       },
     });
 
-    return await response.json();
+    console.log("Delete response status:", response.status);
+    
+    const responseText = await response.text();
+    console.log("Delete response:", responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse delete response:", parseError);
+      return { 
+        message: "Invalid server response",
+        error: `Server returned: ${responseText.substring(0, 100)}`
+      };
+    }
+
+    return data;
   } catch (error) {
     console.error("Delete error:", error);
-    return { message: "Network error" };
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    return { 
+      message: "Network error",
+      error: errorMessage
+    };
   }
 }
