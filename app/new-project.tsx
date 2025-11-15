@@ -57,14 +57,25 @@ export default function NewProjectScreen() {
 
       const result = await createProject(accessKey, projectData);
 
-      if (result.success) {
+      if (result.success && result.data) {
+        console.log("[NewProject] Project created successfully:", result.data);
+        
+        // Navigate to the newly created project
+        const projectId = result.data.id;
+        const projectName = result.data.name;
+        
         Alert.alert(
           "Success",
           "Project created successfully!",
           [
             {
               text: "OK",
-              onPress: () => router.back(),
+              onPress: () => {
+                router.replace({
+                  pathname: "/project-detail",
+                  params: { projectId, projectName },
+                });
+              },
             },
           ]
         );

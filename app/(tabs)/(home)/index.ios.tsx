@@ -351,23 +351,12 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Processing & Analysis</Text>
 
           <FeatureCard
-            icon="map.fill"
-            androidIcon="map"
-            title="Generate Maps"
-            description="Create topographic maps from imagery"
-            onPress={() => router.push("/generate")}
-            color={colors.primary}
-          />
-
-          <FeatureCard
             icon="cube.transparent"
             androidIcon="view_in_ar"
             title="3D Processing"
-            description="Process images into 3D models"
-            onPress={() => {
-              Alert.alert("3D Processing", "3D processing feature coming soon!");
-            }}
-            color={colors.primaryDark}
+            description="Configure Autodesk 3D processing settings"
+            onPress={() => router.push("/autodesk-settings")}
+            color={colors.primary}
           />
 
           <FeatureCard
@@ -376,7 +365,7 @@ export default function HomeScreen() {
             title="Media Gallery"
             description="View project images and models"
             onPress={() => router.push("/gallery")}
-            color={colors.primary}
+            color={colors.primaryDark}
           />
 
           <Text style={styles.sectionTitle}>Account & Settings</Text>
@@ -387,6 +376,15 @@ export default function HomeScreen() {
             title="Subscription"
             description="Manage your subscription plan"
             onPress={() => router.push("/subscription")}
+            color={colors.primary}
+          />
+
+          <FeatureCard
+            icon="heart.fill"
+            androidIcon="favorite"
+            title="Donate"
+            description="Support PhotoForge development"
+            onPress={() => router.push("/donate")}
             color={colors.primaryDark}
           />
 
@@ -397,15 +395,6 @@ export default function HomeScreen() {
             description="Get help and submit tickets"
             onPress={() => router.push("/support")}
             color={colors.primary}
-          />
-
-          <FeatureCard
-            icon="photo.on.rectangle.angled"
-            androidIcon="edit"
-            title="Image Editor"
-            description="Edit and enhance your images"
-            onPress={() => router.push("/edit")}
-            color={colors.primaryDark}
           />
         </View>
 

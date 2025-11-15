@@ -192,7 +192,10 @@ export default function ProjectDetailScreen() {
 
           <Button
             onPress={() => {
-              Alert.alert("Process 3D", "3D processing feature coming soon!");
+              router.push({
+                pathname: "/autodesk-settings",
+                params: { projectId, projectName },
+              });
             }}
             style={styles.actionButton}
           >
