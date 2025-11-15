@@ -155,18 +155,21 @@ export default function ProjectDetailScreen() {
 
           <Button
             onPress={() => {
-              Alert.alert("Upload Media", "Media upload feature coming soon!");
+              router.push({
+                pathname: "/processing-workflow",
+                params: { projectId, projectName },
+              });
             }}
             style={styles.actionButton}
           >
             <View style={styles.buttonContent}>
               <IconSymbol
-                ios_icon_name="photo.badge.plus"
-                android_material_icon_name="add_photo_alternate"
+                ios_icon_name="cube.transparent"
+                android_material_icon_name="view_in_ar"
                 size={24}
                 color={colors.surface}
               />
-              <Text style={styles.buttonText}>Upload Media</Text>
+              <Text style={styles.buttonText}>3D Image Processing</Text>
             </View>
           </Button>
 
@@ -193,39 +196,41 @@ export default function ProjectDetailScreen() {
           <Button
             onPress={() => {
               router.push({
-                pathname: "/autodesk-settings",
-                params: { projectId, projectName },
+                pathname: "/drone-control",
               });
-            }}
-            style={styles.actionButton}
-          >
-            <View style={styles.buttonContent}>
-              <IconSymbol
-                ios_icon_name="cube.transparent"
-                android_material_icon_name="view_in_ar"
-                size={24}
-                color={colors.surface}
-              />
-              <Text style={styles.buttonText}>Process 3D Model</Text>
-            </View>
-          </Button>
-
-          <Button
-            onPress={() => {
-              Alert.alert("View Models", "Model viewer feature coming soon!");
             }}
             variant="outline"
             style={styles.actionButton}
           >
             <View style={styles.buttonContent}>
               <IconSymbol
-                ios_icon_name="eye.fill"
-                android_material_icon_name="visibility"
+                ios_icon_name="antenna.radiowaves.left.and.right"
+                android_material_icon_name="settings_remote"
                 size={24}
                 color={colors.primary}
               />
               <Text style={[styles.buttonText, { color: colors.primary }]}>
-                View Models
+                Drone Control
+              </Text>
+            </View>
+          </Button>
+
+          <Button
+            onPress={() => {
+              router.push("/donate");
+            }}
+            variant="outline"
+            style={styles.actionButton}
+          >
+            <View style={styles.buttonContent}>
+              <IconSymbol
+                ios_icon_name="heart.fill"
+                android_material_icon_name="favorite"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.buttonText, { color: colors.primary }]}>
+                Support Project
               </Text>
             </View>
           </Button>

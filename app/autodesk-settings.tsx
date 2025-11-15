@@ -26,17 +26,36 @@ export default function AutodeskSettingsScreen() {
   const projectId = params.projectId as string;
   const projectName = params.projectName as string;
 
-  const [quality, setQuality] = useState("high");
-  const [outputFormat, setOutputFormat] = useState("obj");
-  const [generateTextures, setGenerateTextures] = useState(true);
+  // Quality Settings
+  const [quality, setQuality] = useState<"low" | "medium" | "high" | "ultra">("high");
+  
+  // Output Types
+  const [generate3DMesh, setGenerate3DMesh] = useState(true);
+  const [generateOrthomosaic, setGenerateOrthomosaic] = useState(true);
   const [generatePointCloud, setGeneratePointCloud] = useState(true);
-  const [generateMesh, setGenerateMesh] = useState(true);
-  const [decimationLevel, setDecimationLevel] = useState("medium");
+  const [generateDEM, setGenerateDEM] = useState(false);
+  
+  // Output Formats
+  const [meshFormat, setMeshFormat] = useState<"obj" | "fbx" | "ply" | "stl">("obj");
+  const [pointCloudFormat, setPointCloudFormat] = useState<"las" | "laz" | "ply">("las");
+  const [orthomosaicFormat, setOrthomosaicFormat] = useState<"geotiff" | "jpg" | "png">("geotiff");
+  
+  // Advanced Settings
+  const [coordinateSystem, setCoordinateSystem] = useState("WGS84");
+  const [useGCP, setUseGCP] = useState(false);
+  const [gcpFile, setGcpFile] = useState("");
+  
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleStartProcessing = async () => {
     if (!projectId) {
       Alert.alert("Error", "No project selected");
+      return;
+    }
+
+    // Validate at least one output type is selected
+    if (!generate3DMesh && !generateOrthomosaic && !generatePointCloud && !generateDEM) {
+      Alert.alert("Error", "Please select at least one output type");
       return;
     }
 
@@ -50,27 +69,38 @@ export default function AutodeskSettingsScreen() {
         return;
       }
 
+      // Build output types array
+      const outputTypes = [];
+      if (generate3DMesh) outputTypes.push("mesh");
+      if (generateOrthomosaic) outputTypes.push("orthomosaic");
+      if (generatePointCloud) outputTypes.push("point_cloud");
+      if (generateDEM) outputTypes.push("dem");
+
       const processingSettings = {
         quality,
-        output_format: outputFormat,
-        generate_textures: generateTextures,
-        generate_point_cloud: generatePointCloud,
-        generate_mesh: generateMesh,
-        decimation_level: decimationLevel,
+        output_types: outputTypes,
+        formats: {
+          mesh: meshFormat,
+          point_cloud: pointCloudFormat,
+          orthomosaic: orthomosaicFormat,
+        },
+        coordinate_system: coordinateSystem,
+        use_gcp: useGCP,
+        gcp_file: gcpFile || undefined,
       };
 
       console.log("[AutodeskSettings] Starting 3D processing with settings:", processingSettings);
 
       const result = await autodeskRealityCapture({
         project_id: projectId,
-        image_urls: [],
+        image_urls: [], // Will be fetched from project media files on backend
         processing_settings: processingSettings,
       });
 
       if (result.success) {
         Alert.alert(
           "Processing Started",
-          "Your 3D model processing has been queued. You will be notified when it's complete.",
+          `Your 3D model processing has been queued.\n\nJob ID: ${result.job_id}\n\nYou will be notified when it's complete.`,
           [
             {
               text: "OK",
@@ -134,13 +164,14 @@ export default function AutodeskSettingsScreen() {
           </View>
         )}
 
+        {/* Quality Settings */}
         <View style={styles.formSection}>
           <Text style={styles.sectionTitle}>Quality Settings</Text>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Processing Quality</Text>
             <View style={styles.segmentedControl}>
-              {["low", "medium", "high", "ultra"].map((q) => (
+              {(["low", "medium", "high", "ultra"] as const).map((q) => (
                 <Pressable
                   key={q}
                   style={[
@@ -161,80 +192,49 @@ export default function AutodeskSettingsScreen() {
               ))}
             </View>
             <Text style={styles.helpText}>
-              Higher quality takes longer but produces better results
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Decimation Level</Text>
-            <View style={styles.segmentedControl}>
-              {["low", "medium", "high"].map((d) => (
-                <Pressable
-                  key={d}
-                  style={[
-                    styles.segmentButton,
-                    decimationLevel === d && styles.segmentButtonActive,
-                  ]}
-                  onPress={() => setDecimationLevel(d)}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      decimationLevel === d && styles.segmentTextActive,
-                    ]}
-                  >
-                    {d.charAt(0).toUpperCase() + d.slice(1)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.helpText}>
-              Controls polygon count reduction for optimized models
+              {quality === "low" && "Preview quality - Fast processing (1-2 hours)"}
+              {quality === "medium" && "Standard quality - Balanced (2-4 hours)"}
+              {quality === "high" && "Professional quality - Recommended (4-6 hours)"}
+              {quality === "ultra" && "Maximum quality - Slow (6+ hours)"}
             </Text>
           </View>
         </View>
 
+        {/* Output Types */}
         <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Output Options</Text>
+          <Text style={styles.sectionTitle}>Output Types</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Output Format</Text>
-            <View style={styles.segmentedControl}>
-              {["obj", "fbx", "ply", "stl"].map((format) => (
-                <Pressable
-                  key={format}
-                  style={[
-                    styles.segmentButton,
-                    outputFormat === format && styles.segmentButtonActive,
-                  ]}
-                  onPress={() => setOutputFormat(format)}
-                >
-                  <Text
-                    style={[
-                      styles.segmentText,
-                      outputFormat === format && styles.segmentTextActive,
-                    ]}
-                  >
-                    {format.toUpperCase()}
-                  </Text>
-                </Pressable>
-              ))}
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <IconSymbol
+                ios_icon_name="cube.fill"
+                android_material_icon_name="view_in_ar"
+                size={20}
+                color={colors.textPrimary}
+              />
+              <Text style={styles.switchText}>3D Mesh</Text>
             </View>
+            <Switch
+              value={generate3DMesh}
+              onValueChange={setGenerate3DMesh}
+              trackColor={{ false: colors.accentBorder, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
           </View>
 
           <View style={styles.switchRow}>
             <View style={styles.switchLabel}>
               <IconSymbol
-                ios_icon_name="paintbrush.fill"
-                android_material_icon_name="palette"
+                ios_icon_name="map.fill"
+                android_material_icon_name="map"
                 size={20}
                 color={colors.textPrimary}
               />
-              <Text style={styles.switchText}>Generate Textures</Text>
+              <Text style={styles.switchText}>Orthomosaic (2D Map)</Text>
             </View>
             <Switch
-              value={generateTextures}
-              onValueChange={setGenerateTextures}
+              value={generateOrthomosaic}
+              onValueChange={setGenerateOrthomosaic}
               trackColor={{ false: colors.accentBorder, true: colors.primary }}
               thumbColor={colors.surface}
             />
@@ -248,7 +248,7 @@ export default function AutodeskSettingsScreen() {
                 size={20}
                 color={colors.textPrimary}
               />
-              <Text style={styles.switchText}>Generate Point Cloud</Text>
+              <Text style={styles.switchText}>Point Cloud</Text>
             </View>
             <Switch
               value={generatePointCloud}
@@ -261,20 +261,159 @@ export default function AutodeskSettingsScreen() {
           <View style={styles.switchRow}>
             <View style={styles.switchLabel}>
               <IconSymbol
-                ios_icon_name="cube.fill"
-                android_material_icon_name="view_in_ar"
+                ios_icon_name="mountain.2.fill"
+                android_material_icon_name="terrain"
                 size={20}
                 color={colors.textPrimary}
               />
-              <Text style={styles.switchText}>Generate 3D Mesh</Text>
+              <Text style={styles.switchText}>DEM (Elevation Model)</Text>
             </View>
             <Switch
-              value={generateMesh}
-              onValueChange={setGenerateMesh}
+              value={generateDEM}
+              onValueChange={setGenerateDEM}
               trackColor={{ false: colors.accentBorder, true: colors.primary }}
               thumbColor={colors.surface}
             />
           </View>
+        </View>
+
+        {/* Output Formats */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Output Formats</Text>
+
+          {generate3DMesh && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>3D Mesh Format</Text>
+              <View style={styles.segmentedControl}>
+                {(["obj", "fbx", "ply", "stl"] as const).map((format) => (
+                  <Pressable
+                    key={format}
+                    style={[
+                      styles.segmentButton,
+                      meshFormat === format && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => setMeshFormat(format)}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        meshFormat === format && styles.segmentTextActive,
+                      ]}
+                    >
+                      {format.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {generatePointCloud && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Point Cloud Format</Text>
+              <View style={styles.segmentedControl}>
+                {(["las", "laz", "ply"] as const).map((format) => (
+                  <Pressable
+                    key={format}
+                    style={[
+                      styles.segmentButton,
+                      pointCloudFormat === format && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => setPointCloudFormat(format)}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        pointCloudFormat === format && styles.segmentTextActive,
+                      ]}
+                    >
+                      {format.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {generateOrthomosaic && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Orthomosaic Format</Text>
+              <View style={styles.segmentedControl}>
+                {(["geotiff", "jpg", "png"] as const).map((format) => (
+                  <Pressable
+                    key={format}
+                    style={[
+                      styles.segmentButton,
+                      orthomosaicFormat === format && styles.segmentButtonActive,
+                    ]}
+                    onPress={() => setOrthomosaicFormat(format)}
+                  >
+                    <Text
+                      style={[
+                        styles.segmentText,
+                        orthomosaicFormat === format && styles.segmentTextActive,
+                      ]}
+                    >
+                      {format === "geotiff" ? "GeoTIFF" : format.toUpperCase()}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Advanced Settings */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Advanced Settings</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Coordinate System</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="WGS84"
+              placeholderTextColor={colors.textSecondary}
+              value={coordinateSystem}
+              onChangeText={setCoordinateSystem}
+            />
+            <Text style={styles.helpText}>
+              Default: WGS84 (GPS coordinates)
+            </Text>
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <IconSymbol
+                ios_icon_name="location.circle.fill"
+                android_material_icon_name="my_location"
+                size={20}
+                color={colors.textPrimary}
+              />
+              <Text style={styles.switchText}>Use Ground Control Points (GCP)</Text>
+            </View>
+            <Switch
+              value={useGCP}
+              onValueChange={setUseGCP}
+              trackColor={{ false: colors.accentBorder, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+
+          {useGCP && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>GCP File URL</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="https://example.com/gcp.txt"
+                placeholderTextColor={colors.textSecondary}
+                value={gcpFile}
+                onChangeText={setGcpFile}
+              />
+              <Text style={styles.helpText}>
+                Optional: Provide GCP file for survey-grade accuracy
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.infoBox}>
@@ -287,8 +426,9 @@ export default function AutodeskSettingsScreen() {
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Processing Time</Text>
             <Text style={styles.infoText}>
-              Processing time varies based on quality settings and number of images. 
-              You&apos;ll receive a notification when processing is complete.
+              Processing time varies based on quality settings and number of images (50-500+). 
+              You&apos;ll receive a notification when processing is complete. You can leave this 
+              page and continue using the app.
             </Text>
           </View>
         </View>
@@ -384,6 +524,16 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
     marginBottom: 8,
+  },
+  input: {
+    height: 48,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+    color: colors.textPrimary,
   },
   segmentedControl: {
     flexDirection: "row",
