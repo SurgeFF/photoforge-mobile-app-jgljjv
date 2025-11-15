@@ -134,7 +134,7 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron_right"
               size={24}
-              color={colors.grey}
+              color={colors.textSecondary}
             />
           </Pressable>
 
@@ -152,7 +152,7 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron_right"
               size={24}
-              color={colors.grey}
+              color={colors.textSecondary}
             />
           </Pressable>
 
@@ -170,7 +170,7 @@ export default function ProfileScreen() {
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron_right"
               size={24}
-              color={colors.grey}
+              color={colors.textSecondary}
             />
           </Pressable>
         </View>
@@ -199,7 +199,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
   scrollView: {
     flex: 1,
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
   },
   section: {
     marginBottom: 32,
@@ -227,15 +227,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accentBorder,
   },
   infoRow: {
     flexDirection: "row",
@@ -252,19 +252,19 @@ const styles = StyleSheet.create({
   },
   infoValue: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   settingItem: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accentBorder,
   },
   settingLeft: {
     flexDirection: "row",
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
   },
   settingText: {
     fontSize: 16,
-    color: colors.text,
+    color: colors.textPrimary,
     fontWeight: "600",
   },
   logoutButton: {
@@ -290,6 +290,6 @@ const styles = StyleSheet.create({
   },
   footerSubtext: {
     fontSize: 12,
-    color: colors.grey,
+    color: colors.textSecondary,
   },
 });

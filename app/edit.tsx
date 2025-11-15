@@ -150,31 +150,35 @@ export default function EditScreen() {
             ios_icon_name="photo.on.rectangle.angled"
             android_material_icon_name="edit"
             size={48}
-            color={colors.secondary}
+            color={colors.primaryDark}
           />
           <Text style={styles.title}>Edit Image</Text>
           <Text style={styles.subtitle}>Enhance and modify your photos</Text>
         </View>
 
         <View style={styles.buttonGroup}>
-          <Button onPress={pickImage} style={styles.actionButton}>
-            <IconSymbol
-              ios_icon_name="photo.on.rectangle"
-              android_material_icon_name="photo_library"
-              size={24}
-              color={colors.text}
-            />
-            <Text style={styles.buttonText}>Choose from Library</Text>
+          <Button onPress={pickImage} variant="secondary" style={styles.actionButton}>
+            <View style={styles.buttonContent}>
+              <IconSymbol
+                ios_icon_name="photo.on.rectangle"
+                android_material_icon_name="photo_library"
+                size={24}
+                color={colors.textPrimary}
+              />
+              <Text style={styles.buttonText}>Choose from Library</Text>
+            </View>
           </Button>
 
-          <Button onPress={takePhoto} style={styles.actionButton}>
-            <IconSymbol
-              ios_icon_name="camera.fill"
-              android_material_icon_name="camera_alt"
-              size={24}
-              color={colors.text}
-            />
-            <Text style={styles.buttonText}>Take Photo</Text>
+          <Button onPress={takePhoto} variant="secondary" style={styles.actionButton}>
+            <View style={styles.buttonContent}>
+              <IconSymbol
+                ios_icon_name="camera.fill"
+                android_material_icon_name="camera_alt"
+                size={24}
+                color={colors.textPrimary}
+              />
+              <Text style={styles.buttonText}>Take Photo</Text>
+            </View>
           </Button>
         </View>
 
@@ -196,7 +200,7 @@ export default function EditScreen() {
 
         {isEnhancing && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.secondary} />
+            <ActivityIndicator size="large" color={colors.primaryDark} />
             <Text style={styles.loadingText}>Enhancing your image...</Text>
           </View>
         )}
@@ -219,7 +223,7 @@ export default function EditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
   scrollView: {
     flex: 1,
@@ -236,7 +240,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
     marginTop: 16,
   },
   subtitle: {
@@ -249,16 +253,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   actionButton: {
+    height: 56,
+  },
+  buttonContent: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
-    height: 56,
   },
   buttonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.text,
+    color: colors.textPrimary,
   },
   imageContainer: {
     marginTop: 32,
@@ -267,13 +273,13 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.textPrimary,
   },
   image: {
     width: "100%",
     height: 400,
     borderRadius: 16,
-    backgroundColor: colors.card,
+    backgroundColor: colors.backgroundWarm,
   },
   enhanceButton: {
     height: 56,

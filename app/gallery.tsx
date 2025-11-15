@@ -179,7 +179,7 @@ export default function GalleryScreen() {
       <SafeAreaView style={styles.container} edges={["top"]}>
         <TopographicBackground />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading gallery...</Text>
         </View>
       </SafeAreaView>
@@ -195,7 +195,7 @@ export default function GalleryScreen() {
             ios_icon_name="photo.stack"
             android_material_icon_name="collections"
             size={48}
-            color={colors.accent}
+            color={colors.primary}
           />
           <Text style={styles.title}>Gallery</Text>
           <Text style={styles.subtitle}>Your created images</Text>
@@ -207,7 +207,7 @@ export default function GalleryScreen() {
               ios_icon_name="photo.on.rectangle.angled"
               android_material_icon_name="image"
               size={64}
-              color={colors.grey}
+              color={colors.textSecondary}
             />
             <Text style={styles.emptyText}>No images yet</Text>
             <Text style={styles.emptySubtext}>
@@ -232,7 +232,7 @@ export default function GalleryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
   content: {
     flex: 1,
@@ -246,7 +246,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
     marginTop: 16,
   },
   subtitle: {
@@ -264,23 +264,23 @@ const styles = StyleSheet.create({
   imageCard: {
     flex: 1,
     margin: 6,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accentBorder,
   },
   thumbnail: {
     width: "100%",
     height: 150,
-    backgroundColor: colors.backgroundAlt,
+    backgroundColor: colors.backgroundWarm,
   },
   imageInfo: {
     padding: 12,
   },
   promptText: {
     fontSize: 14,
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   dateText: {
@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 8,
     right: 8,
-    backgroundColor: colors.background + "CC",
+    backgroundColor: colors.surface + "CC",
     borderRadius: 20,
     padding: 8,
   },
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.textPrimary,
     marginTop: 16,
   },
   emptySubtext: {

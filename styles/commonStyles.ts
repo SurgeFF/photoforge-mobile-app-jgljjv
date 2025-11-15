@@ -1,45 +1,79 @@
 
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
-// PhotoForge color scheme - matching professional image generation tools
+// PhotoForge color palette - matching the webapp design
 export const colors = {
-  primary: '#6366f1',      // Indigo - primary action color
-  secondary: '#8b5cf6',    // Purple - secondary actions
-  accent: '#ec4899',       // Pink - accent highlights
-  background: '#0f1419',   // Very dark blue-gray
-  backgroundAlt: '#1a1f3a', // Dark blue
-  text: '#f8fafc',         // Almost white
-  textSecondary: '#94a3b8', // Light gray
-  grey: '#64748b',         // Medium gray
-  card: '#1e293b',         // Dark slate
-  border: '#334155',       // Border color
-  success: '#10b981',      // Green
-  error: '#ef4444',        // Red
-  warning: '#f59e0b',      // Orange
+  primary: '#c87941',           // Main brand color, buttons, highlights
+  primaryDark: '#8b5a2b',       // Darker shade for gradients
+  backgroundLight: '#f5f1e8',   // Main background color
+  backgroundWarm: '#d4c4a8',    // Navigation, cards, elevated surfaces
+  accentBorder: '#c4a574',      // Borders, dividers
+  textPrimary: '#3d2f20',       // Primary text color
+  textSecondary: '#6b5544',     // Secondary text, labels
+  surface: '#ffffff',           // Cards, inputs (80% opacity with backdrop blur)
+  
+  // Legacy aliases for compatibility
+  background: '#f5f1e8',
+  text: '#3d2f20',
+  grey: '#6b5544',
+  card: '#d4c4a8',
+  border: '#c4a574',
+  success: '#10b981',
+  error: '#ef4444',
+  warning: '#f59e0b',
+};
+
+export const typography = {
+  headingLarge: {
+    fontSize: 24,
+    fontWeight: '700' as const,
+    color: colors.textPrimary,
+  },
+  headingMedium: {
+    fontSize: 18,
+    fontWeight: '600' as const,
+    color: colors.textPrimary,
+  },
+  body: {
+    fontSize: 16,
+    fontWeight: '400' as const,
+    color: colors.textPrimary,
+  },
+  bodySmall: {
+    fontSize: 14,
+    fontWeight: '400' as const,
+    color: colors.textSecondary,
+  },
+  caption: {
+    fontSize: 12,
+    fontWeight: '400' as const,
+    color: colors.textSecondary,
+  },
 };
 
 export const buttonStyles = StyleSheet.create({
-  instructionsButton: {
+  primary: {
     backgroundColor: colors.primary,
-    alignSelf: 'center',
-    width: '100%',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
-  backButton: {
-    backgroundColor: colors.backgroundAlt,
-    alignSelf: 'center',
-    width: '100%',
+  primaryText: {
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: '600' as const,
   },
 });
 
 export const commonStyles = StyleSheet.create({
   wrapper: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
     width: '100%',
     height: '100%',
   },
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
     width: '100%',
     height: '100%',
     justifyContent: 'center',
@@ -53,16 +87,12 @@ export const commonStyles = StyleSheet.create({
     width: '100%',
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
+    ...typography.headingLarge,
     textAlign: 'center',
-    color: colors.text,
-    marginBottom: 10
+    marginBottom: 10,
   },
   text: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text,
+    ...typography.body,
     marginBottom: 8,
     lineHeight: 24,
     textAlign: 'center',
@@ -78,19 +108,24 @@ export const commonStyles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   card: {
-    backgroundColor: colors.card,
-    borderColor: colors.border,
+    backgroundColor: colors.surface + 'CC', // 80% opacity
+    borderColor: colors.accentBorder,
     borderWidth: 1,
     borderRadius: 12,
     padding: 16,
     marginVertical: 8,
     width: '100%',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.3)',
+    boxShadow: '0px 4px 12px rgba(61, 47, 32, 0.15)',
     elevation: 4,
   },
   icon: {
     width: 60,
     height: 60,
     tintColor: colors.primary,
+  },
+  navBar: {
+    backgroundColor: colors.backgroundWarm + 'F2', // 95% opacity
+    borderColor: colors.accentBorder,
+    borderWidth: 1,
   },
 });

@@ -125,7 +125,7 @@ export default function GenerateScreen() {
             <TextInput
               style={styles.textArea}
               placeholder="Describe the image you want to create..."
-              placeholderTextColor={colors.grey}
+              placeholderTextColor={colors.textSecondary}
               value={prompt}
               onChangeText={setPrompt}
               multiline
@@ -139,7 +139,7 @@ export default function GenerateScreen() {
             <TextInput
               style={styles.textArea}
               placeholder="What to avoid in the image..."
-              placeholderTextColor={colors.grey}
+              placeholderTextColor={colors.textSecondary}
               value={negativePrompt}
               onChangeText={setNegativePrompt}
               multiline
@@ -182,7 +182,7 @@ export default function GenerateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
   scrollView: {
     flex: 1,
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
     marginTop: 16,
   },
   subtitle: {
@@ -217,16 +217,16 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.text,
+    color: colors.textPrimary,
   },
   textArea: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    color: colors.text,
-    borderWidth: 2,
-    borderColor: colors.border,
+    color: colors.textPrimary,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
     minHeight: 100,
   },
   generateButton: {
@@ -240,13 +240,13 @@ const styles = StyleSheet.create({
   resultTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: colors.text,
+    color: colors.textPrimary,
   },
   image: {
     width: "100%",
     height: 400,
     borderRadius: 16,
-    backgroundColor: colors.card,
+    backgroundColor: colors.backgroundWarm,
   },
   saveButton: {
     height: 48,

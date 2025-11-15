@@ -166,7 +166,7 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.backgroundLight }]}>
         <TopographicBackground />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
@@ -185,14 +185,14 @@ export default function HomeScreen() {
             <View style={styles.logoContainer}>
               <View style={styles.iconWrapper}>
                 <IconSymbol
-                  ios_icon_name="photo.stack.fill"
-                  android_material_icon_name="photo_library"
+                  ios_icon_name="map.fill"
+                  android_material_icon_name="map"
                   size={64}
-                  color={colors.primary}
+                  color={colors.surface}
                 />
               </View>
               <Text style={styles.title}>PhotoForge</Text>
-              <Text style={styles.subtitle}>AI-Powered Image Generation</Text>
+              <Text style={styles.subtitle}>Drone Mapping</Text>
             </View>
 
             <View style={styles.formContainer}>
@@ -201,11 +201,11 @@ export default function HomeScreen() {
                 style={[
                   styles.input,
                   {
-                    borderColor: error ? colors.error : colors.border,
+                    borderColor: error ? colors.error : colors.accentBorder,
                   },
                 ]}
                 placeholder="Enter your access key"
-                placeholderTextColor={colors.grey}
+                placeholderTextColor={colors.textSecondary}
                 value={accessKey}
                 onChangeText={(text) => {
                   setAccessKey(text);
@@ -294,7 +294,7 @@ export default function HomeScreen() {
             title="Edit Images"
             description="Enhance and modify your photos"
             onPress={() => router.push("/edit")}
-            color={colors.secondary}
+            color={colors.primaryDark}
           />
 
           <FeatureCard
@@ -303,7 +303,7 @@ export default function HomeScreen() {
             title="Gallery"
             description="View your created images"
             onPress={() => router.push("/gallery")}
-            color={colors.accent}
+            color={colors.primary}
           />
         </View>
 
@@ -350,7 +350,7 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
           ios_icon_name="chevron.right"
           android_material_icon_name="chevron_right"
           size={24}
-          color={colors.grey}
+          color={colors.textSecondary}
         />
       </View>
     </Button>
@@ -360,7 +360,7 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundLight,
   },
   scrollView: {
     flex: 1,
@@ -390,17 +390,29 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 24,
-    backgroundColor: colors.card,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
-    borderWidth: 2,
-    borderColor: colors.primary,
+    ...Platform.select({
+      ios: {
+        shadowColor: colors.textPrimary,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.3,
+        shadowRadius: 16,
+      },
+      android: {
+        elevation: 12,
+      },
+      web: {
+        boxShadow: '0px 8px 24px rgba(61, 47, 32, 0.3)',
+      },
+    }),
   },
   title: {
     fontSize: 36,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
     marginTop: 8,
   },
   subtitle: {
@@ -414,7 +426,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.text,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   input: {
@@ -422,9 +434,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    borderWidth: 2,
-    backgroundColor: colors.card,
-    color: colors.text,
+    borderWidth: 1,
+    backgroundColor: colors.surface + 'CC',
+    color: colors.textPrimary,
   },
   errorContainer: {
     flexDirection: "row",
@@ -446,10 +458,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
     padding: 16,
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accentBorder,
   },
   infoText: {
     fontSize: 14,
@@ -482,7 +494,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 32,
     fontWeight: "800",
-    color: colors.text,
+    color: colors.textPrimary,
     textAlign: "center",
   },
   welcomeSubtitle: {
@@ -495,11 +507,11 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   featureCard: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface + 'CC',
     borderRadius: 16,
     padding: 0,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.accentBorder,
     marginBottom: 0,
   },
   featureContent: {
@@ -522,7 +534,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     marginBottom: 4,
-    color: colors.text,
+    color: colors.textPrimary,
   },
   featureDescription: {
     fontSize: 14,

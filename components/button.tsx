@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TextStyle,
-  useColorScheme,
   ViewStyle,
 } from "react-native";
 import { colors } from "@/styles/commonStyles";
@@ -35,8 +34,6 @@ export default function Button({
   style,
   textStyle,
 }: ButtonProps) {
-  const colorScheme = useColorScheme();
-
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
       ...styles.base,
@@ -59,7 +56,7 @@ export default function Button({
       case "secondary":
         return {
           ...baseStyle,
-          backgroundColor: colors.secondary,
+          backgroundColor: colors.backgroundWarm,
         };
       case "outline":
         return {
@@ -87,11 +84,21 @@ export default function Button({
     if (disabled || loading) {
       return {
         ...baseTextStyle,
-        color: colors.grey,
+        color: colors.textSecondary,
       };
     }
 
     switch (variant) {
+      case "primary":
+        return {
+          ...baseTextStyle,
+          color: colors.surface,
+        };
+      case "secondary":
+        return {
+          ...baseTextStyle,
+          color: colors.textPrimary,
+        };
       case "outline":
       case "ghost":
         return {
@@ -101,7 +108,7 @@ export default function Button({
       default:
         return {
           ...baseTextStyle,
-          color: colors.text,
+          color: colors.surface,
         };
     }
   };
@@ -119,7 +126,7 @@ export default function Button({
       {loading ? (
         <ActivityIndicator
           size="small"
-          color={variant === "outline" || variant === "ghost" ? colors.primary : colors.text}
+          color={variant === "outline" || variant === "ghost" ? colors.primary : colors.surface}
         />
       ) : typeof children === "string" ? (
         <Text style={[getTextStyle(), textStyle]}>{children}</Text>
@@ -166,7 +173,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   disabled: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.backgroundWarm,
     opacity: 0.5,
   },
   pressed: {

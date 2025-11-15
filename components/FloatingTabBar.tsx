@@ -76,19 +76,30 @@ export default function FloatingTabBar({
     >
       <BlurView
         intensity={80}
-        tint={theme.dark ? 'dark' : 'light'}
+        tint="light"
         style={[
           styles.container,
           {
             width: containerWidth,
             borderRadius: borderRadius,
-            backgroundColor: colors.card + 'CC',
+            backgroundColor: colors.backgroundWarm + 'F2', // 95% opacity
             borderWidth: 1,
-            borderColor: colors.border,
+            borderColor: colors.accentBorder,
           },
         ]}
       >
-        <Animated.View style={[styles.indicator, indicatorStyle, { borderRadius: borderRadius - 4 }]} />
+        <Animated.View 
+          style={[
+            styles.indicator, 
+            indicatorStyle, 
+            { 
+              borderRadius: borderRadius - 4,
+              backgroundColor: colors.primary + '20',
+              borderWidth: 2,
+              borderColor: colors.primary,
+            }
+          ]} 
+        />
         {tabs.map((tab, index) => {
           const isActive = pathname === tab.route;
           return (
@@ -142,27 +153,24 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: colors.textPrimary,
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
+        shadowOpacity: 0.15,
         shadowRadius: 12,
       },
       android: {
         elevation: 8,
       },
       web: {
-        boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.3)',
+        boxShadow: '0px 4px 20px rgba(61, 47, 32, 0.15)',
       },
     }),
   },
   indicator: {
     position: 'absolute',
     height: '80%',
-    backgroundColor: colors.primary + '20',
     top: '10%',
     left: 8,
-    borderWidth: 2,
-    borderColor: colors.primary,
   },
   tab: {
     flex: 1,
