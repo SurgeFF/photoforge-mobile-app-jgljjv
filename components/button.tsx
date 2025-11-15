@@ -1,5 +1,4 @@
 
-import { appleBlue, zincColors } from "@/constants/Colors";
 import React from "react";
 import {
   ActivityIndicator,
@@ -10,6 +9,7 @@ import {
   useColorScheme,
   ViewStyle,
 } from "react-native";
+import { colors } from "@/styles/commonStyles";
 
 type ButtonVariant = "primary" | "secondary" | "outline" | "ghost";
 type ButtonSize = "small" | "medium" | "large";
@@ -36,82 +36,74 @@ export default function Button({
   textStyle,
 }: ButtonProps) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
 
   const getButtonStyle = (): ViewStyle => {
     const baseStyle: ViewStyle = {
-      borderRadius: 12,
-      alignItems: "center",
-      justifyContent: "center",
-      flexDirection: "row",
+      ...styles.base,
+      ...styles[size],
     };
 
-    // Size styles
-    const sizeStyles: Record<ButtonSize, ViewStyle> = {
-      small: { paddingHorizontal: 12, paddingVertical: 8, minHeight: 36 },
-      medium: { paddingHorizontal: 20, paddingVertical: 12, minHeight: 44 },
-      large: { paddingHorizontal: 24, paddingVertical: 16, minHeight: 52 },
-    };
+    if (disabled || loading) {
+      return {
+        ...baseStyle,
+        ...styles.disabled,
+      };
+    }
 
-    // Variant styles
-    const variantStyles: Record<ButtonVariant, ViewStyle> = {
-      primary: {
-        backgroundColor: appleBlue,
-      },
-      secondary: {
-        backgroundColor: isDark ? zincColors[700] : zincColors[200],
-      },
-      outline: {
-        backgroundColor: "transparent",
-        borderWidth: 2,
-        borderColor: isDark ? zincColors[600] : zincColors[300],
-      },
-      ghost: {
-        backgroundColor: "transparent",
-      },
-    };
-
-    return {
-      ...baseStyle,
-      ...sizeStyles[size],
-      ...variantStyles[variant],
-      opacity: disabled || loading ? 0.5 : 1,
-    };
+    switch (variant) {
+      case "primary":
+        return {
+          ...baseStyle,
+          backgroundColor: colors.primary,
+        };
+      case "secondary":
+        return {
+          ...baseStyle,
+          backgroundColor: colors.secondary,
+        };
+      case "outline":
+        return {
+          ...baseStyle,
+          backgroundColor: "transparent",
+          borderWidth: 2,
+          borderColor: colors.primary,
+        };
+      case "ghost":
+        return {
+          ...baseStyle,
+          backgroundColor: "transparent",
+        };
+      default:
+        return baseStyle;
+    }
   };
 
   const getTextStyle = (): TextStyle => {
-    const baseStyle: TextStyle = {
-      fontWeight: "600",
+    const baseTextStyle: TextStyle = {
+      ...styles.text,
+      ...styles[`${size}Text` as keyof typeof styles],
     };
 
-    // Size styles
-    const sizeStyles: Record<ButtonSize, TextStyle> = {
-      small: { fontSize: 14 },
-      medium: { fontSize: 16 },
-      large: { fontSize: 18 },
-    };
+    if (disabled || loading) {
+      return {
+        ...baseTextStyle,
+        color: colors.grey,
+      };
+    }
 
-    // Variant styles
-    const variantStyles: Record<ButtonVariant, TextStyle> = {
-      primary: {
-        color: "#FFFFFF",
-      },
-      secondary: {
-        color: isDark ? "#FFFFFF" : zincColors[900],
-      },
-      outline: {
-        color: isDark ? "#FFFFFF" : zincColors[900],
-      },
-      ghost: {
-        color: appleBlue,
-      },
-    };
-
-    return {
-      ...baseStyle,
-      ...sizeStyles[size],
-      ...variantStyles[variant],
-    };
+    switch (variant) {
+      case "outline":
+      case "ghost":
+        return {
+          ...baseTextStyle,
+          color: colors.primary,
+        };
+      default:
+        return {
+          ...baseTextStyle,
+          color: colors.text,
+        };
+    }
   };
 
   return (
@@ -126,8 +118,8 @@ export default function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === "primary" ? "#FFFFFF" : appleBlue}
           size="small"
+          color={variant === "outline" || variant === "ghost" ? colors.primary : colors.text}
         />
       ) : typeof children === "string" ? (
         <Text style={[getTextStyle(), textStyle]}>{children}</Text>
@@ -139,7 +131,46 @@ export default function Button({
 }
 
 const styles = StyleSheet.create({
+  base: {
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    flexDirection: "row",
+  },
+  small: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    minHeight: 36,
+  },
+  medium: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    minHeight: 48,
+  },
+  large: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    minHeight: 56,
+  },
+  text: {
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  smallText: {
+    fontSize: 14,
+  },
+  mediumText: {
+    fontSize: 16,
+  },
+  largeText: {
+    fontSize: 18,
+  },
+  disabled: {
+    backgroundColor: colors.card,
+    opacity: 0.5,
+  },
   pressed: {
-    opacity: 0.7,
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }],
   },
 });

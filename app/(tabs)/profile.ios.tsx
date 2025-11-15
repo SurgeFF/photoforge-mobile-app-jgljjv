@@ -1,12 +1,5 @@
 
-import { SafeAreaView } from "react-native-safe-area-context";
-import { GlassView } from "expo-glass-effect";
 import React, { useState } from "react";
-import { useTheme } from "@react-navigation/native";
-import { IconSymbol } from "@/components/IconSymbol";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Button from "@/components/button";
-import { colors } from "@/styles/commonStyles";
 import {
   View,
   Text,
@@ -15,14 +8,20 @@ import {
   Alert,
   Pressable,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Button from "@/components/button";
+import { colors } from "@/styles/commonStyles";
+import { IconSymbol } from "@/components/IconSymbol";
+import TopographicBackground from "@/components/TopographicBackground";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const [showKey, setShowKey] = useState(false);
-  const [accessKey, setAccessKey] = useState("");
+  const [accessKey, setAccessKey] = useState<string>("");
 
   React.useEffect(() => {
     loadAccessKey();
@@ -35,7 +34,7 @@ export default function ProfileScreen() {
         setAccessKey(key);
       }
     } catch (error) {
-      console.error("Error loading access key:", error);
+      console.error("[Profile] Error loading access key:", error);
     }
   };
 
@@ -49,24 +48,27 @@ export default function ProfileScreen() {
           text: "Logout",
           style: "destructive",
           onPress: async () => {
+            console.log("[Profile] Logging out...");
             await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
-            router.replace("/(tabs)/(home)");
+            router.replace("/");
+            console.log("[Profile] Logged out successfully");
           },
         },
       ]
     );
   };
 
-  const handleClearCache = () => {
+  const handleClearCache = async () => {
     Alert.alert(
       "Clear Cache",
-      "This will clear all cached images and data.",
+      "This will clear all cached data. Continue?",
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Clear",
           style: "destructive",
           onPress: () => {
+            console.log("[Profile] Cache cleared");
             Alert.alert("Success", "Cache cleared successfully");
           },
         },
@@ -75,14 +77,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={["top"]}
-    >
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <TopographicBackground />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
@@ -93,205 +92,104 @@ export default function ProfileScreen() {
               color={colors.primary}
             />
           </View>
-          <Text style={styles.title}>PhotoForge Account</Text>
-          <Text style={styles.subtitle}>Manage your settings</Text>
+          <Text style={styles.title}>Profile</Text>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
-
-          <GlassView
-            style={[
-              styles.card,
-              { backgroundColor: theme.dark ? colors.backgroundAlt : "#f5f5f5" },
-            ]}
-            intensity={20}
-          >
-            <View style={styles.cardRow}>
-              <View style={styles.cardIcon}>
-                <IconSymbol
-                  ios_icon_name="key.fill"
-                  android_material_icon_name="vpn_key"
-                  size={24}
-                  color={colors.primary}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Access Key</Text>
-                <Text style={styles.cardValue}>
-                  {showKey ? accessKey : "••••••••••••••••"}
+          
+          <View style={styles.card}>
+            <View style={styles.infoRow}>
+              <IconSymbol
+                ios_icon_name="key.fill"
+                android_material_icon_name="vpn_key"
+                size={24}
+                color={colors.primary}
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Access Key</Text>
+                <Text style={styles.infoValue}>
+                  {accessKey ? `${accessKey.substring(0, 20)}...` : "Not set"}
                 </Text>
               </View>
-              <Pressable onPress={() => setShowKey(!showKey)}>
-                <IconSymbol
-                  ios_icon_name={showKey ? "eye.slash.fill" : "eye.fill"}
-                  android_material_icon_name={showKey ? "visibility_off" : "visibility"}
-                  size={24}
-                  color={colors.grey}
-                />
-              </Pressable>
             </View>
-          </GlassView>
+          </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>App Settings</Text>
-
-          <GlassView
-            style={[
-              styles.card,
-              { backgroundColor: theme.dark ? colors.backgroundAlt : "#f5f5f5" },
-            ]}
-            intensity={20}
-          >
-            <Pressable style={styles.cardRow}>
-              <View style={styles.cardIcon}>
-                <IconSymbol
-                  ios_icon_name="bell.fill"
-                  android_material_icon_name="notifications"
-                  size={24}
-                  color={colors.accent}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Notifications</Text>
-                <Text style={styles.cardDescription}>
-                  Get notified when images are ready
-                </Text>
-              </View>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          
+          <Pressable style={styles.settingItem}>
+            <View style={styles.settingLeft}>
               <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron_right"
+                ios_icon_name="bell.fill"
+                android_material_icon_name="notifications"
                 size={24}
-                color={colors.grey}
+                color={colors.textSecondary}
               />
-            </Pressable>
-          </GlassView>
+              <Text style={styles.settingText}>Notifications</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={24}
+              color={colors.grey}
+            />
+          </Pressable>
 
-          <GlassView
-            style={[
-              styles.card,
-              { backgroundColor: theme.dark ? colors.backgroundAlt : "#f5f5f5" },
-            ]}
-            intensity={20}
-          >
-            <Pressable style={styles.cardRow}>
-              <View style={styles.cardIcon}>
-                <IconSymbol
-                  ios_icon_name="photo.fill"
-                  android_material_icon_name="image"
-                  size={24}
-                  color={colors.secondary}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Image Quality</Text>
-                <Text style={styles.cardDescription}>High quality (1024x1024)</Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron_right"
-                size={24}
-                color={colors.grey}
-              />
-            </Pressable>
-          </GlassView>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Data & Storage</Text>
-
-          <Button
-            onPress={handleClearCache}
-            variant="outline"
-            style={styles.actionButton}
-          >
-            <View style={styles.buttonContent}>
+          <Pressable style={styles.settingItem} onPress={handleClearCache}>
+            <View style={styles.settingLeft}>
               <IconSymbol
                 ios_icon_name="trash.fill"
                 android_material_icon_name="delete"
-                size={20}
-                color={theme.colors.text}
+                size={24}
+                color={colors.textSecondary}
               />
-              <Text style={[styles.buttonText, { color: theme.colors.text }]}>
-                Clear Cache
-              </Text>
+              <Text style={styles.settingText}>Clear Cache</Text>
             </View>
-          </Button>
-        </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={24}
+              color={colors.grey}
+            />
+          </Pressable>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-
-          <GlassView
-            style={[
-              styles.card,
-              { backgroundColor: theme.dark ? colors.backgroundAlt : "#f5f5f5" },
-            ]}
-            intensity={20}
-          >
-            <View style={styles.cardRow}>
-              <View style={styles.cardIcon}>
-                <IconSymbol
-                  ios_icon_name="info.circle.fill"
-                  android_material_icon_name="info"
-                  size={24}
-                  color={colors.grey}
-                />
-              </View>
-              <View style={styles.cardContent}>
-                <Text style={styles.cardTitle}>Version</Text>
-                <Text style={styles.cardDescription}>1.0.0</Text>
-              </View>
+          <Pressable style={styles.settingItem}>
+            <View style={styles.settingLeft}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={24}
+                color={colors.textSecondary}
+              />
+              <Text style={styles.settingText}>About</Text>
             </View>
-          </GlassView>
-
-          <Pressable
-            onPress={() => {
-              Alert.alert(
-                "PhotoForge Mobile",
-                "A mobile companion app for PhotoForge.base44.app\n\nCreate stunning AI-powered images on the go."
-              );
-            }}
-          >
-            <GlassView
-              style={[
-                styles.card,
-                { backgroundColor: theme.dark ? colors.backgroundAlt : "#f5f5f5" },
-              ]}
-              intensity={20}
-            >
-              <View style={styles.cardRow}>
-                <View style={styles.cardIcon}>
-                  <IconSymbol
-                    ios_icon_name="questionmark.circle.fill"
-                    android_material_icon_name="help"
-                    size={24}
-                    color={colors.grey}
-                  />
-                </View>
-                <View style={styles.cardContent}>
-                  <Text style={styles.cardTitle}>Help & Support</Text>
-                  <Text style={styles.cardDescription}>Get help using the app</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={24}
-                  color={colors.grey}
-                />
-              </View>
-            </GlassView>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={24}
+              color={colors.grey}
+            />
           </Pressable>
         </View>
 
-        <Button
-          onPress={handleLogout}
-          variant="outline"
-          style={styles.logoutButton}
-        >
-          <Text style={styles.logoutText}>Logout</Text>
-        </Button>
+        <View style={styles.section}>
+          <Button
+            onPress={handleLogout}
+            variant="outline"
+            style={styles.logoutButton}
+          >
+            Logout
+          </Button>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>PhotoForge Mobile v1.0.0</Text>
+          <Text style={styles.footerSubtext}>
+            Powered by PhotoForge.base44.app
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -300,13 +198,13 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    paddingTop: 24,
-    paddingHorizontal: 24,
+    padding: 24,
     paddingBottom: 120,
   },
   header: {
@@ -320,84 +218,76 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: "800",
     color: colors.text,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.grey,
-    marginTop: 4,
-    textAlign: "center",
   },
   section: {
     marginBottom: 32,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 18,
     fontWeight: "700",
-    color: colors.grey,
-    textTransform: "uppercase",
-    letterSpacing: 1,
+    color: colors.text,
     marginBottom: 12,
   },
   card: {
-    borderRadius: 16,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
-    boxShadow: "0px 2px 8px rgba(0, 0, 0, 0.1)",
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  cardRow: {
+  infoRow: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 16,
   },
-  cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: colors.background + "40",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  cardContent: {
+  infoContent: {
     flex: 1,
   },
-  cardTitle: {
+  infoLabel: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  infoValue: {
     fontSize: 16,
-    fontWeight: "600",
     color: colors.text,
-    marginBottom: 2,
+    fontWeight: "600",
   },
-  cardValue: {
-    fontSize: 14,
-    color: colors.grey,
-    fontFamily: "Courier",
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: colors.grey,
-  },
-  actionButton: {
-    height: 56,
-    marginBottom: 12,
-  },
-  buttonContent: {
+  settingItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
+    justifyContent: "space-between",
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  buttonText: {
+  settingLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  settingText: {
     fontSize: 16,
+    color: colors.text,
     fontWeight: "600",
   },
   logoutButton: {
     height: 56,
-    marginTop: 16,
-    borderColor: "#FF3B30",
   },
-  logoutText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FF3B30",
+  footer: {
+    alignItems: "center",
+    marginTop: 32,
+  },
+  footerText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  footerSubtext: {
+    fontSize: 12,
+    color: colors.grey,
   },
 });

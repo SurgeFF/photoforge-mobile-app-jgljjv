@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -17,66 +18,70 @@ import * as ImagePicker from "expo-image-picker";
 import Button from "@/components/button";
 import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
-import { SafeAreaView } from "react-native-safe-area-context";
+import TopographicBackground from "@/components/TopographicBackground";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
 export default function EditScreen() {
   const theme = useTheme();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [editedImage, setEditedImage] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "Permission to access camera roll is required!");
-      return;
-    }
-
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images" as any,
+      mediaTypes: ["images"],
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 1,
     });
 
-    if (!result.canceled && result.assets[0]) {
+    if (!result.canceled) {
+      console.log("[Edit] Image selected from library");
       setSelectedImage(result.assets[0].uri);
-      setEditedImage(null);
+      setEnhancedImage(null);
     }
   };
 
   const takePhoto = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-
-    if (permissionResult.granted === false) {
-      Alert.alert("Permission Required", "Permission to access camera is required!");
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Camera permission is required");
       return;
     }
 
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 1,
     });
 
-    if (!result.canceled && result.assets[0]) {
+    if (!result.canceled) {
+      console.log("[Edit] Photo taken with camera");
       setSelectedImage(result.assets[0].uri);
-      setEditedImage(null);
+      setEnhancedImage(null);
     }
   };
 
   const handleEnhance = async () => {
-    if (!selectedImage) return;
+    if (!selectedImage) {
+      Alert.alert("Error", "Please select an image first");
+      return;
+    }
 
-    setIsProcessing(true);
+    setIsEnhancing(true);
 
     try {
       const accessKey = await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
+      if (!accessKey) {
+        Alert.alert("Error", "Not authenticated");
+        router.replace("/");
+        return;
+      }
 
-      // Create form data
+      console.log("\n========== IMAGE ENHANCEMENT ==========");
+      console.log("[Enhance] Starting image enhancement...");
+      console.log("[Enhance] Image URI:", selectedImage);
+      console.log("[Enhance] API Endpoint: https://photoforge.base44.app/api/enhance");
+
       const formData = new FormData();
       formData.append("image", {
         uri: selectedImage,
@@ -87,159 +92,123 @@ export default function EditScreen() {
       const response = await fetch("https://photoforge.base44.app/api/enhance", {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${accessKey}`,
+          Authorization: `Bearer ${accessKey}`,
         },
         body: formData,
       });
 
-      const data = await response.json();
+      console.log("[Enhance] Response status:", response.status);
+      
+      const responseText = await response.text();
+      console.log("[Enhance] Response body:", responseText);
 
-      if (response.ok && data.imageUrl) {
-        setEditedImage(data.imageUrl);
-        console.log("Image enhanced successfully");
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log("[Enhance] Parsed response:", JSON.stringify(data, null, 2));
+      } catch (parseError) {
+        console.error("[Enhance] JSON parse error:", parseError);
+        Alert.alert("Error", "Invalid server response");
+        console.log("========== ENHANCEMENT FAILED ==========\n");
+        return;
+      }
+
+      if (data.imageUrl) {
+        console.log("[Enhance] ✅ Image enhanced successfully");
+        console.log("[Enhance] Enhanced image URL:", data.imageUrl);
+        setEnhancedImage(data.imageUrl);
+        console.log("========== ENHANCEMENT SUCCESS ==========\n");
       } else {
-        Alert.alert("Error", data.message || "Failed to enhance image");
+        const errorMsg = data.message || data.error || "Failed to enhance image";
+        console.log("[Enhance] ❌ Enhancement failed:", errorMsg);
+        Alert.alert("Error", errorMsg);
+        console.log("========== ENHANCEMENT FAILED ==========\n");
       }
     } catch (error) {
-      console.error("Enhancement error:", error);
-      Alert.alert("Error", "Failed to enhance image. Please try again.");
+      console.error("[Enhance] ❌ EXCEPTION during enhancement:", error);
+      console.error("[Enhance] Error details:", error instanceof Error ? error.message : "Unknown error");
+      Alert.alert("Error", "Failed to enhance image. Check console for details.");
+      console.log("========== ENHANCEMENT ERROR ==========\n");
     } finally {
-      setIsProcessing(false);
+      setIsEnhancing(false);
     }
   };
 
-  const handleSave = async () => {
-    if (!editedImage) return;
-
-    Alert.alert("Success", "Image saved to your gallery!");
+  const handleSave = () => {
+    Alert.alert("Success", "Image saved to gallery!");
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      edges={["top"]}
-    >
-      <View style={styles.header}>
-        <Button
-          onPress={() => router.back()}
-          variant="outline"
-          size="small"
-          style={styles.backButton}
-        >
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
-            size={20}
-            color={colors.text}
-          />
-        </Button>
-        <Text style={styles.headerTitle}>Edit Image</Text>
-        <View style={styles.placeholder} />
-      </View>
-
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <TopographicBackground />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
       >
-        {!selectedImage ? (
-          <View style={styles.emptyState}>
+        <View style={styles.header}>
+          <IconSymbol
+            ios_icon_name="photo.on.rectangle.angled"
+            android_material_icon_name="edit"
+            size={48}
+            color={colors.secondary}
+          />
+          <Text style={styles.title}>Edit Image</Text>
+          <Text style={styles.subtitle}>Enhance and modify your photos</Text>
+        </View>
+
+        <View style={styles.buttonGroup}>
+          <Button onPress={pickImage} style={styles.actionButton}>
             <IconSymbol
-              ios_icon_name="photo.on.rectangle.angled"
-              android_material_icon_name="add_photo_alternate"
-              size={80}
-              color={colors.grey}
+              ios_icon_name="photo.on.rectangle"
+              android_material_icon_name="photo_library"
+              size={24}
+              color={colors.text}
             />
-            <Text style={styles.emptyTitle}>No Image Selected</Text>
-            <Text style={styles.emptyDescription}>
-              Choose an image from your gallery or take a new photo
-            </Text>
+            <Text style={styles.buttonText}>Choose from Library</Text>
+          </Button>
 
-            <View style={styles.uploadButtons}>
-              <Button onPress={pickImage} style={styles.uploadButton}>
-                <IconSymbol
-                  ios_icon_name="photo.fill"
-                  android_material_icon_name="photo_library"
-                  size={24}
-                  color="#fff"
-                />
-                <Text style={styles.uploadButtonText}>Choose from Gallery</Text>
-              </Button>
+          <Button onPress={takePhoto} style={styles.actionButton}>
+            <IconSymbol
+              ios_icon_name="camera.fill"
+              android_material_icon_name="camera_alt"
+              size={24}
+              color={colors.text}
+            />
+            <Text style={styles.buttonText}>Take Photo</Text>
+          </Button>
+        </View>
 
-              <Button onPress={takePhoto} variant="outline" style={styles.uploadButton}>
-                <IconSymbol
-                  ios_icon_name="camera.fill"
-                  android_material_icon_name="camera_alt"
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={[styles.uploadButtonText, { color: colors.primary }]}>
-                  Take Photo
-                </Text>
-              </Button>
-            </View>
+        {selectedImage && (
+          <View style={styles.imageContainer}>
+            <Text style={styles.sectionTitle}>Original Image</Text>
+            <Image source={{ uri: selectedImage }} style={styles.image} />
+
+            <Button
+              onPress={handleEnhance}
+              loading={isEnhancing}
+              disabled={isEnhancing}
+              style={styles.enhanceButton}
+            >
+              {isEnhancing ? "Enhancing..." : "Enhance Image"}
+            </Button>
           </View>
-        ) : (
-          <View style={styles.editSection}>
-            <View style={styles.imagePreviewContainer}>
-              <Text style={styles.sectionTitle}>Original</Text>
-              <View style={styles.imageWrapper}>
-                <Image
-                  source={{ uri: selectedImage }}
-                  style={styles.previewImage}
-                  resizeMode="cover"
-                />
-              </View>
-            </View>
+        )}
 
-            {editedImage && (
-              <View style={styles.imagePreviewContainer}>
-                <Text style={styles.sectionTitle}>Enhanced</Text>
-                <View style={styles.imageWrapper}>
-                  <Image
-                    source={{ uri: editedImage }}
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                  />
-                </View>
-              </View>
-            )}
+        {isEnhancing && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.secondary} />
+            <Text style={styles.loadingText}>Enhancing your image...</Text>
+          </View>
+        )}
 
-            {isProcessing && (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.loadingText}>Enhancing your image...</Text>
-              </View>
-            )}
+        {enhancedImage && (
+          <View style={styles.imageContainer}>
+            <Text style={styles.sectionTitle}>Enhanced Image</Text>
+            <Image source={{ uri: enhancedImage }} style={styles.image} />
 
-            <View style={styles.actionButtons}>
-              {!editedImage && !isProcessing && (
-                <Button
-                  onPress={handleEnhance}
-                  disabled={isProcessing}
-                  style={styles.actionButton}
-                >
-                  Enhance Image
-                </Button>
-              )}
-
-              {editedImage && (
-                <Button onPress={handleSave} style={styles.actionButton}>
-                  Save to Gallery
-                </Button>
-              )}
-
-              <Button
-                onPress={() => {
-                  setSelectedImage(null);
-                  setEditedImage(null);
-                }}
-                variant="outline"
-                style={styles.actionButton}
-              >
-                Choose Different Image
-              </Button>
-            </View>
+            <Button onPress={handleSave} style={styles.saveButton}>
+              Save to Gallery
+            </Button>
           </View>
         )}
       </ScrollView>
@@ -250,110 +219,75 @@ export default function EditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.grey + "33",
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    padding: 0,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  placeholder: {
-    width: 40,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 24,
+    paddingTop: Platform.OS === "android" ? 24 : 0,
     paddingBottom: 120,
   },
-  emptyState: {
+  header: {
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 48,
+    marginBottom: 32,
   },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: "700",
+  title: {
+    fontSize: 28,
+    fontWeight: "800",
     color: colors.text,
-    marginTop: 24,
+    marginTop: 16,
   },
-  emptyDescription: {
+  subtitle: {
     fontSize: 16,
-    color: colors.grey,
-    textAlign: "center",
+    color: colors.textSecondary,
     marginTop: 8,
-    paddingHorizontal: 32,
+    textAlign: "center",
   },
-  uploadButtons: {
-    width: "100%",
-    marginTop: 32,
+  buttonGroup: {
     gap: 12,
   },
-  uploadButton: {
-    height: 56,
+  actionButton: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
+    height: 56,
   },
-  uploadButtonText: {
+  buttonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#fff",
+    color: colors.text,
   },
-  editSection: {
-    gap: 24,
-  },
-  imagePreviewContainer: {
-    marginBottom: 16,
+  imageContainer: {
+    marginTop: 32,
+    gap: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "700",
     color: colors.text,
-    marginBottom: 12,
   },
-  imageWrapper: {
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 16,
-    overflow: "hidden",
-    aspectRatio: 1,
-  },
-  previewImage: {
+  image: {
     width: "100%",
-    height: "100%",
+    height: 400,
+    borderRadius: 16,
+    backgroundColor: colors.card,
+  },
+  enhanceButton: {
+    height: 56,
+  },
+  saveButton: {
+    height: 48,
   },
   loadingContainer: {
+    marginTop: 32,
     alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 32,
+    gap: 16,
   },
   loadingText: {
     fontSize: 16,
-    color: colors.grey,
-    marginTop: 16,
-  },
-  actionButtons: {
-    gap: 12,
-    marginTop: 8,
-  },
-  actionButton: {
-    height: 48,
+    color: colors.textSecondary,
   },
 });
