@@ -389,9 +389,33 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopographicBackground />
       
-      {/* Top Bar with Title Only */}
+      {/* Top Bar with Home and Profile buttons */}
       <View style={styles.topBar}>
+        <Pressable 
+          onPress={() => router.push("/(tabs)/(home)/")} 
+          style={styles.topBarButton}
+        >
+          <IconSymbol
+            ios_icon_name="house.fill"
+            android_material_icon_name="home"
+            size={24}
+            color={colors.primary}
+          />
+        </Pressable>
+        
         <Text style={styles.topBarTitle}>PhotoForge</Text>
+        
+        <Pressable 
+          onPress={() => router.push("/(tabs)/profile")} 
+          style={styles.topBarButton}
+        >
+          <IconSymbol
+            ios_icon_name="person.fill"
+            android_material_icon_name="person"
+            size={24}
+            color={colors.primary}
+          />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -666,13 +690,18 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 12,
     paddingTop: Platform.OS === "android" ? 48 : 12,
     backgroundColor: colors.surface + "99",
     borderBottomWidth: 1,
     borderBottomColor: colors.accentBorder,
+  },
+  topBarButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundLight,
   },
   topBarTitle: {
     fontSize: 24,
@@ -684,7 +713,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-    paddingBottom: 140,
+    paddingBottom: 40,
   },
   statsCard: {
     backgroundColor: colors.surface + "99",

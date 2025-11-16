@@ -80,18 +80,33 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container} edges={["top"]}>
       <TopographicBackground />
       
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
+      {/* Top Bar with Home and Profile buttons */}
+      <View style={styles.topBar}>
+        <Pressable 
+          onPress={() => router.push("/(tabs)/(home)/")} 
+          style={styles.topBarButton}
+        >
           <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            ios_icon_name="house.fill"
+            android_material_icon_name="home"
             size={24}
-            color={colors.textPrimary}
+            color={colors.primary}
           />
         </Pressable>
-        <Text style={styles.headerTitle}>Profile</Text>
-        <View style={styles.placeholder} />
+        
+        <Text style={styles.topBarTitle}>Profile</Text>
+        
+        <Pressable 
+          onPress={() => router.push("/(tabs)/profile")} 
+          style={styles.topBarButton}
+        >
+          <IconSymbol
+            ios_icon_name="person.fill"
+            android_material_icon_name="person"
+            size={24}
+            color={colors.primary}
+          />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -214,35 +229,32 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.backgroundLight,
   },
-  header: {
+  topBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 12,
+    backgroundColor: colors.surface + "99",
     borderBottomWidth: 1,
     borderBottomColor: colors.accentBorder,
-    backgroundColor: colors.surface + "99",
   },
-  backButton: {
+  topBarButton: {
     padding: 8,
+    borderRadius: 8,
+    backgroundColor: colors.backgroundLight,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
+  topBarTitle: {
+    fontSize: 24,
+    fontWeight: "800",
     color: colors.textPrimary,
-    flex: 1,
-    textAlign: "center",
-  },
-  placeholder: {
-    width: 40,
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 24,
-    paddingBottom: 120,
+    paddingBottom: 40,
   },
   profileHeader: {
     alignItems: "center",
