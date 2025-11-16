@@ -19,7 +19,7 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { generateFlightPlan, djiUploadFlightPlan } from "@/utils/apiClient";
+import { generateFlightPlan, djiUploadFlightPlan, getAccessKey } from "@/utils/apiClient";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -75,6 +75,10 @@ export default function FlightPlanningScreen() {
   const [focalLength, setFocalLength] = useState("8.8");
   const [imageWidth, setImageWidth] = useState("5472");
   const [imageHeight, setImageHeight] = useState("3648");
+
+  // Address search
+  const [searchAddress, setSearchAddress] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   // State
   const [isGenerating, setIsGenerating] = useState(false);
@@ -151,6 +155,45 @@ export default function FlightPlanningScreen() {
     }
   };
 
+  const handleAddressSearch = async () => {
+    if (!searchAddress.trim()) {
+      Alert.alert("Error", "Please enter an address");
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      // Use Google Geocoding API to convert address to coordinates
+      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
+      const response = await fetch(geocodeUrl);
+      const data = await response.json();
+
+      if (data.status === "OK" && data.results.length > 0) {
+        const location = data.results[0].geometry.location;
+        console.log("📍 Address found:", location);
+
+        // Send coordinates to map to pan to location
+        if (webViewRef.current) {
+          webViewRef.current.injectJavaScript(`
+            if (typeof panToLocation === 'function') {
+              panToLocation(${location.lat}, ${location.lng});
+            }
+            true;
+          `);
+        }
+
+        Alert.alert("Success", `Found: ${data.results[0].formatted_address}`);
+      } else {
+        Alert.alert("Not Found", "Could not find the address. Please try a different search.");
+      }
+    } catch (error) {
+      console.error("❌ Address search error:", error);
+      Alert.alert("Error", "Failed to search address");
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
   const handleGeneratePlan = async () => {
     if (!targetAGL || !photoOverlap) {
       Alert.alert("Error", "Please fill in all required fields");
@@ -202,6 +245,14 @@ export default function FlightPlanningScreen() {
       let spacingMultiplier = 1.0;
       if (gridSpacing === "fine") spacingMultiplier = 0.7;
       else if (gridSpacing === "coarse") spacingMultiplier = 1.5;
+
+      // Get access key for authentication
+      const accessKey = await getAccessKey();
+      if (!accessKey) {
+        Alert.alert("Error", "Authentication required. Please login first.");
+        router.replace("/(tabs)/(home)/");
+        return;
+      }
 
       const result = await generateFlightPlan({
         area: drawnArea || {
@@ -367,8 +418,9 @@ export default function FlightPlanningScreen() {
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
         <style>
-          body { margin: 0; padding: 0; }
-          #map { width: 100%; height: 100vh; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          html, body { height: 100%; overflow: hidden; }
+          #map { width: 100%; height: 100%; touch-action: none; }
         </style>
       </head>
       <body>
@@ -384,7 +436,15 @@ export default function FlightPlanningScreen() {
             map = new google.maps.Map(document.getElementById('map'), {
               center: { lat: 37.7749, lng: -122.4194 },
               zoom: 13,
-              mapTypeId: 'satellite'
+              mapTypeId: 'satellite',
+              gestureHandling: 'greedy',
+              disableDefaultUI: false,
+              zoomControl: true,
+              mapTypeControl: false,
+              scaleControl: true,
+              streetViewControl: false,
+              rotateControl: false,
+              fullscreenControl: false
             });
 
             drawingManager = new google.maps.drawing.DrawingManager({
@@ -435,6 +495,13 @@ export default function FlightPlanningScreen() {
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'map_ready'
             }));
+          }
+
+          function panToLocation(lat, lng) {
+            if (map) {
+              map.panTo({ lat: lat, lng: lng });
+              map.setZoom(15);
+            }
           }
 
           function displayWaypoints(waypoints) {
@@ -517,6 +584,8 @@ export default function FlightPlanningScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
+        scrollEnabled={true}
+        nestedScrollEnabled={true}
       >
         <View style={styles.projectInfo}>
           <IconSymbol
@@ -534,6 +603,36 @@ export default function FlightPlanningScreen() {
         {/* Interactive Map */}
         <View style={styles.mapContainer}>
           <Text style={styles.sectionTitle}>Define Flight Area</Text>
+          
+          {/* Address Search */}
+          <View style={styles.addressSearchContainer}>
+            <TextInput
+              style={styles.addressInput}
+              value={searchAddress}
+              onChangeText={setSearchAddress}
+              placeholder="Enter address to jump to location..."
+              placeholderTextColor={colors.textSecondary}
+              returnKeyType="search"
+              onSubmitEditing={handleAddressSearch}
+            />
+            <Pressable
+              style={styles.searchButton}
+              onPress={handleAddressSearch}
+              disabled={isSearching}
+            >
+              {isSearching ? (
+                <ActivityIndicator size="small" color={colors.surface} />
+              ) : (
+                <IconSymbol
+                  ios_icon_name="magnifyingglass"
+                  android_material_icon_name="search"
+                  size={20}
+                  color={colors.surface}
+                />
+              )}
+            </Pressable>
+          </View>
+
           {Platform.OS === 'web' ? (
             <View style={styles.webNotSupported}>
               <IconSymbol
@@ -560,6 +659,11 @@ export default function FlightPlanningScreen() {
                   javaScriptEnabled={true}
                   domStorageEnabled={true}
                   startInLoadingState={true}
+                  scrollEnabled={false}
+                  bounces={false}
+                  overScrollMode="never"
+                  showsVerticalScrollIndicator={false}
+                  showsHorizontalScrollIndicator={false}
                   renderLoading={() => (
                     <View style={styles.loadingContainer}>
                       <ActivityIndicator size="large" color={colors.primary} />
@@ -1196,6 +1300,30 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     marginBottom: 24,
+  },
+  addressSearchContainer: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  addressInput: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+    color: colors.textPrimary,
+  },
+  searchButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
   },
   mapWrapper: {
     height: 300,

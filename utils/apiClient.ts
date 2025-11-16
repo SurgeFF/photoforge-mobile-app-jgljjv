@@ -77,6 +77,8 @@ export interface ProcessedModel {
   thumbnail_url?: string;
   file_size?: number;
   created_at?: string;
+  processing_status?: string;
+  progress?: number;
   [key: string]: any;
 }
 
@@ -108,6 +110,15 @@ export interface BatchUploadResponse {
       error: string;
     }>;
   };
+  error?: string;
+}
+
+export interface ProcessingStatus {
+  status: "queued" | "processing" | "completed" | "failed";
+  progress: number;
+  message?: string;
+  ai_selection_info?: any;
+  output_url?: string;
   error?: string;
 }
 
@@ -1044,7 +1055,89 @@ export async function djiDisconnect(): Promise<ApiResponse<boolean>> {
 // ==================== PROCESSING ====================
 
 /**
- * Process drone images using Autodesk Reality Capture
+ * Start Autodesk processing with AI selection
+ */
+export async function startProcessingMobile(accessKey: string, params: {
+  project_id?: string;
+  images?: string[];
+  processing_settings?: any;
+}): Promise<ApiResponse<{ model_id: string; job_id: string }>> {
+  try {
+    console.log("🎨 Starting Autodesk processing (mobile)...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/startProcessingMobile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        ...params,
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Processing started");
+      return { success: true, data: { model_id: data.model_id, job_id: data.job_id } };
+    } else {
+      return { success: false, error: data.error || "Failed to start processing" };
+    }
+  } catch (error) {
+    console.error("❌ Start processing error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Check processing status and progress
+ * Poll this every 5 seconds to get updates
+ */
+export async function checkProcessingStatusMobile(accessKey: string, modelId: string): Promise<ApiResponse<ProcessingStatus>> {
+  try {
+    const response = await fetch(`${FUNCTIONS_BASE}/checkProcessingStatusMobile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        model_id: modelId,
+      }),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      return { 
+        success: true, 
+        data: {
+          status: data.status,
+          progress: data.progress || 0,
+          message: data.message,
+          ai_selection_info: data.ai_selection_info,
+          output_url: data.output_url,
+          error: data.error,
+        }
+      };
+    } else {
+      return { success: false, error: data.error || "Failed to check status" };
+    }
+  } catch (error) {
+    console.error("❌ Check processing status error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Process drone images using Autodesk Reality Capture (legacy)
  */
 export async function autodeskRealityCapture(params: {
   project_id: string;
