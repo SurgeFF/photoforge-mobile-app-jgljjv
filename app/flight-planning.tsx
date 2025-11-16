@@ -23,7 +23,8 @@ import { generateFlightPlan, djiUploadFlightPlan } from "@/utils/apiClient";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const GOOGLE_MAPS_API_KEY_STORAGE = "@google_maps_api_key";
+// Hardcoded Google Maps API Key
+const GOOGLE_MAPS_API_KEY = "AIzaSyDCSfZQiUsIAIN73YIyK6EOpaIuMtnD4aE";
 
 interface FlightPlanMetadata {
   total_waypoints: number;
@@ -84,36 +85,7 @@ export default function FlightPlanningScreen() {
   } | null>(null);
   const [drawnArea, setDrawnArea] = useState<any>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [googleMapsApiKey, setGoogleMapsApiKey] = useState("");
   const [mapReady, setMapReady] = useState(false);
-
-  // Load saved Google Maps API key
-  useEffect(() => {
-    loadGoogleMapsApiKey();
-  }, []);
-
-  const loadGoogleMapsApiKey = async () => {
-    try {
-      const savedKey = await AsyncStorage.getItem(GOOGLE_MAPS_API_KEY_STORAGE);
-      if (savedKey) {
-        setGoogleMapsApiKey(savedKey);
-        console.log("✅ Loaded saved Google Maps API key");
-      } else {
-        console.log("⚠️ No Google Maps API key found. Map will use OpenStreetMap.");
-      }
-    } catch (error) {
-      console.error("❌ Error loading Google Maps API key:", error);
-    }
-  };
-
-  const saveGoogleMapsApiKey = async (key: string) => {
-    try {
-      await AsyncStorage.setItem(GOOGLE_MAPS_API_KEY_STORAGE, key);
-      console.log("✅ Saved Google Maps API key");
-    } catch (error) {
-      console.error("❌ Error saving Google Maps API key:", error);
-    }
-  };
 
   // Drone presets
   const dronePresets: Record<string, any> = {
@@ -387,237 +359,139 @@ export default function FlightPlanningScreen() {
     }
   };
 
-  // Generate map HTML
+  // Generate Google Maps HTML
   const getMapHTML = () => {
-    if (googleMapsApiKey) {
-      return `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-          <style>
-            body { margin: 0; padding: 0; }
-            #map { width: 100%; height: 100vh; }
-          </style>
-        </head>
-        <body>
-          <div id="map"></div>
-          <script src="https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=drawing"></script>
-          <script>
-            let map;
-            let drawingManager;
-            let currentPolygon = null;
-            let waypointMarkers = [];
-
-            function initMap() {
-              map = new google.maps.Map(document.getElementById('map'), {
-                center: { lat: 37.7749, lng: -122.4194 },
-                zoom: 13,
-                mapTypeId: 'satellite'
-              });
-
-              drawingManager = new google.maps.drawing.DrawingManager({
-                drawingMode: google.maps.drawing.OverlayType.POLYGON,
-                drawingControl: true,
-                drawingControlOptions: {
-                  position: google.maps.ControlPosition.TOP_CENTER,
-                  drawingModes: ['polygon', 'rectangle']
-                },
-                polygonOptions: {
-                  fillColor: '#4CAF50',
-                  fillOpacity: 0.3,
-                  strokeWeight: 2,
-                  strokeColor: '#4CAF50',
-                  editable: true
-                }
-              });
-
-              drawingManager.setMap(map);
-
-              google.maps.event.addListener(drawingManager, 'overlaycomplete', function(event) {
-                if (currentPolygon) {
-                  currentPolygon.setMap(null);
-                }
-                currentPolygon = event.overlay;
-
-                const path = currentPolygon.getPath();
-                const coordinates = [];
-                for (let i = 0; i < path.getLength(); i++) {
-                  const point = path.getAt(i);
-                  coordinates.push([point.lng(), point.lat()]);
-                }
-                coordinates.push(coordinates[0]);
-
-                const area = {
-                  type: 'Polygon',
-                  coordinates: [coordinates]
-                };
-
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'area_drawn',
-                  area: area
-                }));
-
-                drawingManager.setDrawingMode(null);
-              });
-
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'map_ready'
-              }));
-            }
-
-            function displayWaypoints(waypoints) {
-              waypointMarkers.forEach(marker => marker.setMap(null));
-              waypointMarkers = [];
-
-              if (!waypoints || waypoints.length === 0) return;
-
-              const bounds = new google.maps.LatLngBounds();
-
-              waypoints.forEach((wp, index) => {
-                const marker = new google.maps.Marker({
-                  position: { lat: wp.lat, lng: wp.lon },
-                  map: map,
-                  label: {
-                    text: (index + 1).toString(),
-                    color: 'white',
-                    fontWeight: 'bold'
-                  },
-                  icon: {
-                    path: google.maps.SymbolPath.CIRCLE,
-                    scale: 12,
-                    fillColor: '#4CAF50',
-                    fillOpacity: 1,
-                    strokeColor: 'white',
-                    strokeWeight: 2
-                  }
-                });
-
-                marker.addListener('click', function() {
-                  const infoWindow = new google.maps.InfoWindow({
-                    content: 'Waypoint ' + (index + 1) + '<br>Action: ' + wp.action + '<br>Alt: ' + wp.altitude + 'm'
-                  });
-                  infoWindow.open(map, marker);
-                });
-
-                waypointMarkers.push(marker);
-                bounds.extend({ lat: wp.lat, lng: wp.lon });
-              });
-
-              if (waypoints.length > 1) {
-                const path = waypoints.map(wp => ({ lat: wp.lat, lng: wp.lon }));
-                const flightPath = new google.maps.Polyline({
-                  path: path,
-                  geodesic: true,
-                  strokeColor: '#2196F3',
-                  strokeOpacity: 0.8,
-                  strokeWeight: 2,
-                  map: map
-                });
-                waypointMarkers.push(flightPath);
-              }
-
-              map.fitBounds(bounds);
-            }
-
-            initMap();
-          </script>
-        </body>
-        </html>
-      `;
-    }
-
-    // Default to OpenStreetMap with Leaflet
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        <link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
         <style>
           body { margin: 0; padding: 0; }
           #map { width: 100%; height: 100vh; }
-          .leaflet-container { background: #1a1a2e; }
         </style>
       </head>
       <body>
         <div id="map"></div>
-        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-        <script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+        <script src="https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=drawing"></script>
         <script>
-          var map = L.map('map').setView([37.7749, -122.4194], 13);
-          
-          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
-          }).addTo(map);
+          let map;
+          let drawingManager;
+          let currentPolygon = null;
+          let waypointMarkers = [];
 
-          var drawnItems = new L.FeatureGroup();
-          map.addLayer(drawnItems);
-
-          var drawControl = new L.Control.Draw({
-            edit: {
-              featureGroup: drawnItems
-            },
-            draw: {
-              polygon: true,
-              polyline: false,
-              rectangle: true,
-              circle: false,
-              marker: false,
-              circlemarker: false
-            }
-          });
-          map.addControl(drawControl);
-
-          map.on(L.Draw.Event.CREATED, function (event) {
-            var layer = event.layer;
-            drawnItems.clearLayers();
-            drawnItems.addLayer(layer);
-            
-            var geoJSON = layer.toGeoJSON();
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'area_drawn',
-              area: geoJSON.geometry
-            }));
-          });
-
-          var waypointMarkers = [];
-          
-          function displayWaypoints(waypoints) {
-            waypointMarkers.forEach(marker => map.removeLayer(marker));
-            waypointMarkers = [];
-            
-            if (!waypoints || waypoints.length === 0) return;
-            
-            var bounds = [];
-            waypoints.forEach(function(wp, index) {
-              var icon = L.divIcon({
-                className: 'waypoint-marker',
-                html: '<div style="background: #4CAF50; color: white; border-radius: 50%; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border: 2px solid white;">' + (index + 1) + '</div>',
-                iconSize: [24, 24]
-              });
-              
-              var marker = L.marker([wp.lat, wp.lon], { icon: icon }).addTo(map);
-              marker.bindPopup('Waypoint ' + (index + 1) + '<br>Action: ' + wp.action + '<br>Alt: ' + wp.altitude + 'm');
-              waypointMarkers.push(marker);
-              bounds.push([wp.lat, wp.lon]);
+          function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+              center: { lat: 37.7749, lng: -122.4194 },
+              zoom: 13,
+              mapTypeId: 'satellite'
             });
-            
-            if (bounds.length > 0) {
-              map.fitBounds(bounds, { padding: [50, 50] });
-            }
-            
-            if (waypoints.length > 1) {
-              var latlngs = waypoints.map(wp => [wp.lat, wp.lon]);
-              var polyline = L.polyline(latlngs, { color: '#2196F3', weight: 2, dashArray: '5, 10' }).addTo(map);
-              waypointMarkers.push(polyline);
-            }
+
+            drawingManager = new google.maps.drawing.DrawingManager({
+              drawingMode: google.maps.drawing.OverlayType.POLYGON,
+              drawingControl: true,
+              drawingControlOptions: {
+                position: google.maps.ControlPosition.TOP_CENTER,
+                drawingModes: ['polygon', 'rectangle']
+              },
+              polygonOptions: {
+                fillColor: '#4CAF50',
+                fillOpacity: 0.3,
+                strokeWeight: 2,
+                strokeColor: '#4CAF50',
+                editable: true
+              }
+            });
+
+            drawingManager.setMap(map);
+
+            google.maps.event.addListener(drawingManager, 'overlaycomplete', function(event) {
+              if (currentPolygon) {
+                currentPolygon.setMap(null);
+              }
+              currentPolygon = event.overlay;
+
+              const path = currentPolygon.getPath();
+              const coordinates = [];
+              for (let i = 0; i < path.getLength(); i++) {
+                const point = path.getAt(i);
+                coordinates.push([point.lng(), point.lat()]);
+              }
+              coordinates.push(coordinates[0]);
+
+              const area = {
+                type: 'Polygon',
+                coordinates: [coordinates]
+              };
+
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'area_drawn',
+                area: area
+              }));
+
+              drawingManager.setDrawingMode(null);
+            });
+
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'map_ready'
+            }));
           }
 
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'map_ready'
-          }));
+          function displayWaypoints(waypoints) {
+            waypointMarkers.forEach(marker => marker.setMap(null));
+            waypointMarkers = [];
+
+            if (!waypoints || waypoints.length === 0) return;
+
+            const bounds = new google.maps.LatLngBounds();
+
+            waypoints.forEach((wp, index) => {
+              const marker = new google.maps.Marker({
+                position: { lat: wp.lat, lng: wp.lon },
+                map: map,
+                label: {
+                  text: (index + 1).toString(),
+                  color: 'white',
+                  fontWeight: 'bold'
+                },
+                icon: {
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 12,
+                  fillColor: '#4CAF50',
+                  fillOpacity: 1,
+                  strokeColor: 'white',
+                  strokeWeight: 2
+                }
+              });
+
+              marker.addListener('click', function() {
+                const infoWindow = new google.maps.InfoWindow({
+                  content: 'Waypoint ' + (index + 1) + '<br>Action: ' + wp.action + '<br>Alt: ' + wp.altitude + 'm'
+                });
+                infoWindow.open(map, marker);
+              });
+
+              waypointMarkers.push(marker);
+              bounds.extend({ lat: wp.lat, lng: wp.lon });
+            });
+
+            if (waypoints.length > 1) {
+              const path = waypoints.map(wp => ({ lat: wp.lat, lng: wp.lon }));
+              const flightPath = new google.maps.Polyline({
+                path: path,
+                geodesic: true,
+                strokeColor: '#2196F3',
+                strokeOpacity: 0.8,
+                strokeWeight: 2,
+                map: map
+              });
+              waypointMarkers.push(flightPath);
+            }
+
+            map.fitBounds(bounds);
+          }
+
+          initMap();
         </script>
       </body>
       </html>
@@ -660,38 +534,55 @@ export default function FlightPlanningScreen() {
         {/* Interactive Map */}
         <View style={styles.mapContainer}>
           <Text style={styles.sectionTitle}>Define Flight Area</Text>
-          <View style={styles.mapWrapper}>
-            <WebView
-              ref={webViewRef}
-              source={{ html: getMapHTML() }}
-              style={styles.webView}
-              onMessage={handleWebViewMessage}
-              javaScriptEnabled={true}
-              domStorageEnabled={true}
-              startInLoadingState={true}
-              renderLoading={() => (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="large" color={colors.primary} />
-                  <Text style={styles.loadingText}>Loading map...</Text>
-                </View>
-              )}
-            />
-          </View>
-          <Text style={styles.mapHelpText}>
-            📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
-          </Text>
-          {!googleMapsApiKey && (
-            <View style={styles.infoBox}>
+          {Platform.OS === 'web' ? (
+            <View style={styles.webNotSupported}>
               <IconSymbol
-                ios_icon_name="info.circle.fill"
-                android_material_icon_name="info"
-                size={20}
-                color={colors.primary}
+                ios_icon_name="exclamationmark.triangle.fill"
+                android_material_icon_name="warning"
+                size={48}
+                color={colors.warning}
               />
-              <Text style={styles.infoText}>
-                Using OpenStreetMap. Add Google Maps API key in settings for satellite imagery.
+              <Text style={styles.webNotSupportedText}>
+                Interactive map is not available on web preview.
+              </Text>
+              <Text style={styles.webNotSupportedSubtext}>
+                Please use the mobile app (iOS or Android) to access the Google Maps integration for drawing flight areas.
               </Text>
             </View>
+          ) : (
+            <React.Fragment>
+              <View style={styles.mapWrapper}>
+                <WebView
+                  ref={webViewRef}
+                  source={{ html: getMapHTML() }}
+                  style={styles.webView}
+                  onMessage={handleWebViewMessage}
+                  javaScriptEnabled={true}
+                  domStorageEnabled={true}
+                  startInLoadingState={true}
+                  renderLoading={() => (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color={colors.primary} />
+                      <Text style={styles.loadingText}>Loading Google Maps...</Text>
+                    </View>
+                  )}
+                />
+              </View>
+              <Text style={styles.mapHelpText}>
+                📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
+              </Text>
+              <View style={styles.infoBox}>
+                <IconSymbol
+                  ios_icon_name="info.circle.fill"
+                  android_material_icon_name="info"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.infoText}>
+                  Using Google Maps with satellite imagery for accurate flight planning.
+                </Text>
+              </View>
+            </React.Fragment>
           )}
         </View>
 
@@ -1331,6 +1222,30 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     color: colors.textSecondary,
+  },
+  webNotSupported: {
+    height: 300,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 32,
+  },
+  webNotSupportedText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    textAlign: "center",
+    marginTop: 16,
+  },
+  webNotSupportedSubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
   },
   mapHelpText: {
     fontSize: 12,
