@@ -572,7 +572,7 @@ export async function uploadMediaMobile(
 
 /**
  * Upload multiple media files to project in batch
- * Note: Max 250 files per batch
+ * NO FILE LIMIT - All files are sent to webapp for processing
  */
 export async function uploadMediaBatchMobile(
   accessKey: string,
@@ -589,11 +589,7 @@ export async function uploadMediaBatchMobile(
     console.log("📤 Uploading batch of files to project:", projectId);
     console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/uploadMediaBatchMobile`);
     console.log("📁 File count:", files.length);
-    
-    if (files.length > 250) {
-      console.warn("⚠️ File count exceeds 250 limit, truncating...");
-      files = files.slice(0, 250);
-    }
+    console.log("🚀 NO FILE LIMIT - Webapp will handle all files");
     
     const formData = new FormData();
     formData.append('access_key', accessKey);
@@ -1120,15 +1116,21 @@ export async function checkSubscription(accessKey: string): Promise<ApiResponse<
 
 /**
  * Process payment via Square
+ * For subscriptions: amount should be 5 (for $5/month)
+ * For donations: amount is user-specified
  */
 export async function squarePayment(accessKey: string, params: {
-  payment_type: string;
+  payment_type: "donation" | "subscription";
   amount: number;
   nonce: string;
   idempotency_key: string;
+  customer_email?: string;
+  customer_name?: string;
 }): Promise<ApiResponse<any>> {
   try {
     console.log("💰 Processing Square payment...");
+    console.log("   - Type:", params.payment_type);
+    console.log("   - Amount: $", params.amount);
     
     const response = await fetch(`${FUNCTIONS_BASE}/squarePayment`, {
       method: "POST",
@@ -1142,7 +1144,7 @@ export async function squarePayment(accessKey: string, params: {
     const data = await response.json();
     
     if (response.ok && data.success) {
-      console.log("✅ Payment processed");
+      console.log("✅ Payment processed successfully");
       return { success: true, data };
     } else {
       return { success: false, error: data.error || "Payment failed" };

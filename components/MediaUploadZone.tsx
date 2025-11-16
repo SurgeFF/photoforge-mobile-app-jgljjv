@@ -19,8 +19,6 @@ interface MediaUploadZoneProps {
   onUploadComplete: (files: any[]) => void;
 }
 
-const MAX_FILES = 250;
-
 export default function MediaUploadZone({
   projectId,
   onUploadComplete,
@@ -49,14 +47,9 @@ export default function MediaUploadZone({
       });
 
       if (!result.canceled && result.assets) {
-        if (result.assets.length > MAX_FILES) {
-          Alert.alert(
-            "Too Many Files",
-            `You can upload a maximum of ${MAX_FILES} files at once. Only the first ${MAX_FILES} files will be uploaded.`,
-            [{ text: "OK" }]
-          );
-        }
-        await uploadImages(result.assets.slice(0, MAX_FILES));
+        // No limit - send all files to webapp
+        console.log(`[MediaUpload] Selected ${result.assets.length} files`);
+        await uploadImages(result.assets);
       }
     } catch (error) {
       console.error("Error selecting images:", error);
@@ -78,6 +71,7 @@ export default function MediaUploadZone({
 
       const totalFiles = assets.length;
       console.log(`[MediaUpload] Starting upload of ${totalFiles} files to project ${projectId}`);
+      console.log(`[MediaUpload] No file limit - webapp will handle all files`);
 
       // Prepare files for batch upload
       const files = assets.map((asset, index) => ({
@@ -192,7 +186,7 @@ export default function MediaUploadZone({
           <>
             <IconSymbol
               ios_icon_name="photo.badge.plus"
-              android_material_icon_name="add_photo_alternate"
+              android_material_icon_name="add-photo-alternate"
               size={48}
               color={colors.primary}
             />
@@ -208,7 +202,7 @@ export default function MediaUploadZone({
                 color={colors.textSecondary}
               />
               <Text style={styles.infoText}>
-                Max {MAX_FILES} files per upload. Images should have GPS/EXIF data for best results.
+                All selected files will be sent to the webapp for processing. Images should have GPS/EXIF data for best results.
               </Text>
             </View>
           </>

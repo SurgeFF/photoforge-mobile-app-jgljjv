@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -17,7 +18,7 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { squarePayment, getAccessKey } from "@/utils/apiClient";
+import SquarePaymentForm from "@/components/SquarePaymentForm";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
 
@@ -28,9 +29,9 @@ export default function DonateScreen() {
   const [donorName, setDonorName] = useState("");
   const [donorEmail, setDonorEmail] = useState("");
   const [message, setMessage] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
 
-  const handleDonate = async () => {
+  const handleDonate = () => {
     const amount = selectedAmount || parseFloat(customAmount);
 
     if (!amount || amount <= 0 || isNaN(amount)) {
@@ -43,49 +44,33 @@ export default function DonateScreen() {
       return;
     }
 
-    setIsProcessing(true);
+    setShowPaymentForm(true);
+  };
 
-    try {
-      const accessKey = await getAccessKey();
-      if (!accessKey) {
-        Alert.alert("Error", "Please login first");
-        router.replace("/(tabs)/(home)/");
-        return;
-      }
+  const handlePaymentSuccess = (result: any) => {
+    setShowPaymentForm(false);
+    Alert.alert(
+      "Thank You!",
+      `Your donation of $${selectedAmount || parseFloat(customAmount)} has been processed successfully.\n\nYou will receive a confirmation email shortly.`,
+      [
+        {
+          text: "OK",
+          onPress: () => router.back(),
+        },
+      ]
+    );
+  };
 
-      console.log("[Donate] Processing donation...");
-      console.log("[Donate] Amount:", amount);
-      console.log("[Donate] Email:", donorEmail);
-
-      // Note: Square Web Payments SDK integration required
-      Alert.alert(
-        "Square Payment Integration Required",
-        "To complete donations, Square Web Payments SDK needs to be integrated.\n\nThis requires:\n\n- Square Application ID\n- Square Location ID\n- Web Payments SDK initialization\n- Payment form with card input\n- Tokenization of payment details\n\nThe payment nonce would then be sent to the backend for processing.\n\nPlease contact the developer to complete the Square integration.",
-        [{ text: "OK" }]
-      );
-
-      // Placeholder for actual Square payment processing
-      // const result = await squarePayment(accessKey, {
-      //   payment_type: "donation",
-      //   amount: amount,
-      //   nonce: "PAYMENT_NONCE_FROM_SQUARE_SDK",
-      //   idempotency_key: `donate_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-      // });
-
-    } catch (error) {
-      console.error("Error processing donation:", error);
-      Alert.alert("Error", "Failed to process donation");
-    } finally {
-      setIsProcessing(false);
-    }
+  const handlePaymentError = (error: string) => {
+    Alert.alert("Payment Failed", error);
   };
 
   const handleCustomAmountChange = (text: string) => {
     // Remove any non-numeric characters except decimal point
-    const cleaned = text.replace(/[^0-9.]/g, '');
+    const cleaned = text.replace(/[^0-9.]/g, "");
     
     // Ensure only one decimal point
-    const parts = cleaned.split('.');
+    const parts = cleaned.split(".");
     if (parts.length > 2) {
       return;
     }
@@ -94,6 +79,8 @@ export default function DonateScreen() {
     setSelectedAmount(null);
   };
 
+  const currentAmount = selectedAmount || parseFloat(customAmount) || 0;
+
   return (
     <SafeAreaView style={styles.container}>
       <TopographicBackground />
@@ -101,7 +88,7 @@ export default function DonateScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={colors.textPrimary}
           />
@@ -223,24 +210,61 @@ export default function DonateScreen() {
           <View style={styles.infoContent}>
             <Text style={styles.infoTitle}>Secure Payment via Square</Text>
             <Text style={styles.infoText}>
-              All donations are processed securely through Square. Your payment information is never stored on our servers. Square integration is currently being configured.
+              All donations are processed securely through Square. Your payment information is encrypted and never stored on our servers.
             </Text>
           </View>
         </View>
 
         <Button
           onPress={handleDonate}
-          loading={isProcessing}
-          disabled={isProcessing}
           style={styles.donateButton}
         >
-          {isProcessing ? "Processing..." : "Donate Now"}
+          Continue to Payment
         </Button>
 
         <Text style={styles.disclaimer}>
           By donating, you agree to our terms of service. Donations are non-refundable.
         </Text>
       </ScrollView>
+
+      <Modal
+        visible={showPaymentForm}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowPaymentForm(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Pressable
+              onPress={() => setShowPaymentForm(false)}
+              style={styles.backButton}
+            >
+              <IconSymbol
+                ios_icon_name="chevron.left"
+                android_material_icon_name="arrow-back"
+                size={24}
+                color={colors.textPrimary}
+              />
+            </Pressable>
+            <Text style={styles.modalTitle}>Payment Details</Text>
+            <View style={styles.placeholder} />
+          </View>
+
+          <ScrollView
+            style={styles.modalScrollView}
+            contentContainerStyle={styles.modalContent}
+          >
+            <SquarePaymentForm
+              amount={currentAmount}
+              paymentType="donation"
+              customerEmail={donorEmail}
+              customerName={donorName}
+              onSuccess={handlePaymentSuccess}
+              onError={handlePaymentError}
+            />
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -417,5 +441,33 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 16,
     lineHeight: 18,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    flex: 1,
+    textAlign: "center",
+  },
+  modalScrollView: {
+    flex: 1,
+  },
+  modalContent: {
+    padding: 24,
+    paddingBottom: 120,
   },
 });
