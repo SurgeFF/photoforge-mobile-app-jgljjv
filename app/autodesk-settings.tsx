@@ -12,6 +12,7 @@ import {
   Switch,
   Modal,
   FlatList,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -20,13 +21,27 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { autodeskRealityCapture, getAccessKey, getProjectsMobile } from "@/utils/apiClient";
+import { 
+  startProcessingMobile, 
+  checkProcessingStatusMobile, 
+  getAccessKey, 
+  getProjectsMobile 
+} from "@/utils/apiClient";
 
 interface Project {
   id: string;
   name: string;
   location?: string;
   status: string;
+}
+
+interface ProcessingStatus {
+  status: "queued" | "processing" | "completed" | "failed";
+  progress: number;
+  message?: string;
+  ai_selection_info?: any;
+  output_url?: string;
+  error?: string;
 }
 
 export default function AutodeskSettingsScreen() {
@@ -63,9 +78,93 @@ export default function AutodeskSettingsScreen() {
   
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Processing status polling
+  const [processingModelId, setProcessingModelId] = useState<string | null>(null);
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     loadProjects();
   }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
+
+  // Start polling when processing starts
+  useEffect(() => {
+    if (processingModelId && !pollingInterval) {
+      console.log("🔄 Starting status polling for model:", processingModelId);
+      startStatusPolling(processingModelId);
+    }
+  }, [processingModelId]);
+
+  const startStatusPolling = (modelId: string) => {
+    // Poll immediately
+    checkStatus(modelId);
+
+    // Then poll every 5 seconds
+    const interval = setInterval(() => {
+      checkStatus(modelId);
+    }, 5000);
+
+    setPollingInterval(interval);
+  };
+
+  const checkStatus = async (modelId: string) => {
+    try {
+      const accessKey = await getAccessKey();
+      if (!accessKey) {
+        console.log("❌ No access key for status check");
+        return;
+      }
+
+      const result = await checkProcessingStatusMobile(accessKey, modelId);
+      
+      if (result.success && result.data) {
+        console.log("📊 Processing status:", result.data.status, "-", result.data.progress + "%");
+        setProcessingStatus(result.data);
+
+        // Stop polling if completed or failed
+        if (result.data.status === "completed" || result.data.status === "failed") {
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+
+          if (result.data.status === "completed") {
+            Alert.alert(
+              "Processing Complete! 🎉",
+              "Your 3D model has been successfully processed and is ready to view.",
+              [
+                {
+                  text: "View Project",
+                  onPress: () => router.back(),
+                },
+                {
+                  text: "OK",
+                  style: "cancel",
+                },
+              ]
+            );
+          } else if (result.data.status === "failed") {
+            Alert.alert(
+              "Processing Failed",
+              result.data.error || "An error occurred during processing. Please try again.",
+              [{ text: "OK" }]
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error checking status:", error);
+    }
+  };
 
   const loadProjects = async () => {
     setLoadingProjects(true);
@@ -138,22 +237,23 @@ export default function AutodeskSettingsScreen() {
 
       console.log("[AutodeskSettings] Starting 3D processing with settings:", processingSettings);
 
-      const result = await autodeskRealityCapture({
+      const result = await startProcessingMobile(accessKey, {
         project_id: selectedProjectId,
-        image_urls: [], // Will be fetched from project media files on backend
         processing_settings: processingSettings,
       });
 
-      if (result.success) {
+      if (result.success && result.data) {
+        console.log("✅ Processing started successfully");
+        console.log("   - Model ID:", result.data.model_id);
+        console.log("   - Job ID:", result.data.job_id);
+
+        // Start polling for status
+        setProcessingModelId(result.data.model_id);
+        
         Alert.alert(
-          "Processing Started",
-          `Your 3D model processing has been queued.\n\nJob ID: ${result.job_id}\n\nYou will be notified when it's complete.`,
-          [
-            {
-              text: "OK",
-              onPress: () => router.back(),
-            },
-          ]
+          "Processing Started! 🚀",
+          `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nProcessing status will be displayed below.`,
+          [{ text: "OK" }]
         );
       } else {
         Alert.alert("Error", result.error || "Failed to start processing");
@@ -163,6 +263,36 @@ export default function AutodeskSettingsScreen() {
       Alert.alert("Error", "Failed to start processing");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "queued":
+        return colors.textSecondary;
+      case "processing":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "failed":
+        return colors.error;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "queued":
+        return { ios: "clock.fill", android: "schedule" };
+      case "processing":
+        return { ios: "gearshape.fill", android: "settings" };
+      case "completed":
+        return { ios: "checkmark.circle.fill", android: "check_circle" };
+      case "failed":
+        return { ios: "xmark.circle.fill", android: "error" };
+      default:
+        return { ios: "circle.fill", android: "circle" };
     }
   };
 
@@ -198,6 +328,50 @@ export default function AutodeskSettingsScreen() {
         <Text style={styles.subtitle}>
           Configure Autodesk Reality Capture settings for 3D model generation
         </Text>
+
+        {/* Processing Status Bar */}
+        {processingStatus && (
+          <View style={styles.statusCard}>
+            <View style={styles.statusHeader}>
+              <View style={styles.statusTitleRow}>
+                <IconSymbol
+                  ios_icon_name={getStatusIcon(processingStatus.status).ios}
+                  android_material_icon_name={getStatusIcon(processingStatus.status).android}
+                  size={24}
+                  color={getStatusColor(processingStatus.status)}
+                />
+                <Text style={styles.statusTitle}>
+                  {processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1)}
+                </Text>
+              </View>
+              <Text style={styles.statusProgress}>{processingStatus.progress}%</Text>
+            </View>
+            
+            {/* Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { 
+                    width: `${processingStatus.progress}%`,
+                    backgroundColor: getStatusColor(processingStatus.status)
+                  }
+                ]} 
+              />
+            </View>
+
+            {processingStatus.message && (
+              <Text style={styles.statusMessage}>{processingStatus.message}</Text>
+            )}
+
+            {processingStatus.status === "processing" && (
+              <View style={styles.statusSpinner}>
+                <ActivityIndicator size="small" color={colors.warning} />
+                <Text style={styles.statusSpinnerText}>Processing in progress...</Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {/* Project Selection */}
         <View style={styles.formSection}>
@@ -499,7 +673,7 @@ export default function AutodeskSettingsScreen() {
         <Button
           onPress={handleStartProcessing}
           loading={isProcessing}
-          disabled={isProcessing || !selectedProjectId}
+          disabled={isProcessing || !selectedProjectId || !!processingModelId}
           style={styles.processButton}
         >
           {isProcessing ? "Starting Processing..." : "Start 3D Processing"}
@@ -631,6 +805,62 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     marginBottom: 24,
+  },
+  statusCard: {
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statusTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  statusProgress: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: colors.accentBorder,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  statusSpinner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  statusSpinnerText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: "italic",
   },
   formSection: {
     marginBottom: 32,

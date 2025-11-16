@@ -17,7 +17,12 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { getProjectsMobile, getAccessKey } from "@/utils/apiClient";
+import { 
+  getProjectsMobile, 
+  getAccessKey, 
+  getProcessedModels,
+  checkProcessingStatusMobile 
+} from "@/utils/apiClient";
 
 interface Project {
   id: string;
@@ -29,15 +34,33 @@ interface Project {
   updated_at?: string;
 }
 
+interface ProjectWithProcessing extends Project {
+  processingStatus?: {
+    status: "queued" | "processing" | "completed" | "failed";
+    progress: number;
+    message?: string;
+  };
+}
+
 export default function ProjectsScreen() {
   const theme = useTheme();
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<ProjectWithProcessing[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadProjects();
   }, []);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
 
   const loadProjects = async () => {
     try {
@@ -54,6 +77,9 @@ export default function ProjectsScreen() {
       if (result.success && result.data) {
         console.log("✅ Projects loaded:", result.data.length);
         setProjects(result.data);
+        
+        // Check for processing models in each project
+        checkProcessingStatus(accessKey, result.data);
       } else {
         console.error("❌ Failed to load projects:", result.error);
         Alert.alert("Error", result.error || "Failed to load projects");
@@ -64,6 +90,60 @@ export default function ProjectsScreen() {
     } finally {
       setIsLoading(false);
       setRefreshing(false);
+    }
+  };
+
+  const checkProcessingStatus = async (accessKey: string, projectsList: Project[]) => {
+    // Check each project for processing models
+    const updatedProjects = await Promise.all(
+      projectsList.map(async (project) => {
+        try {
+          const modelsResult = await getProcessedModels(accessKey, project.id);
+          
+          if (modelsResult.success && modelsResult.data) {
+            // Find any models that are currently processing
+            const processingModel = modelsResult.data.find(
+              (model: any) => model.status === "processing" || model.status === "queued"
+            );
+
+            if (processingModel) {
+              // Get detailed status for this model
+              const statusResult = await checkProcessingStatusMobile(accessKey, processingModel.id);
+              
+              if (statusResult.success && statusResult.data) {
+                return {
+                  ...project,
+                  processingStatus: statusResult.data,
+                };
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error checking processing status for project:", project.id, error);
+        }
+        
+        return project;
+      })
+    );
+
+    setProjects(updatedProjects);
+
+    // If any projects are processing, start polling
+    const hasProcessing = updatedProjects.some(
+      (p) => p.processingStatus && 
+      (p.processingStatus.status === "processing" || p.processingStatus.status === "queued")
+    );
+
+    if (hasProcessing && !pollingInterval) {
+      console.log("🔄 Starting status polling for projects");
+      const interval = setInterval(() => {
+        checkProcessingStatus(accessKey, updatedProjects);
+      }, 5000);
+      setPollingInterval(interval);
+    } else if (!hasProcessing && pollingInterval) {
+      console.log("⏹️ Stopping status polling");
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
     }
   };
 
@@ -79,7 +159,37 @@ export default function ProjectsScreen() {
     });
   };
 
-  const renderProject = ({ item }: { item: Project }) => (
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case "active":
+        return colors.success;
+      case "processing":
+        return colors.warning;
+      case "completed":
+        return colors.primary;
+      case "archived":
+        return colors.textSecondary;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const getProcessingStatusColor = (status: string) => {
+    switch (status) {
+      case "queued":
+        return colors.textSecondary;
+      case "processing":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "failed":
+        return colors.error;
+      default:
+        return colors.textSecondary;
+    }
+  };
+
+  const renderProject = ({ item }: { item: ProjectWithProcessing }) => (
     <Pressable
       style={styles.projectCard}
       onPress={() => handleProjectPress(item)}
@@ -104,6 +214,61 @@ export default function ProjectsScreen() {
       <Text style={styles.projectDate}>
         Created: {new Date(item.created_at || item.created_date || Date.now()).toLocaleDateString()}
       </Text>
+
+      {/* Processing Status Bar */}
+      {item.processingStatus && (
+        <View style={styles.processingStatusContainer}>
+          <View style={styles.processingStatusHeader}>
+            <View style={styles.processingStatusTitleRow}>
+              <IconSymbol
+                ios_icon_name={
+                  item.processingStatus.status === "processing" ? "gearshape.fill" :
+                  item.processingStatus.status === "queued" ? "clock.fill" :
+                  item.processingStatus.status === "completed" ? "checkmark.circle.fill" :
+                  "xmark.circle.fill"
+                }
+                android_material_icon_name={
+                  item.processingStatus.status === "processing" ? "settings" :
+                  item.processingStatus.status === "queued" ? "schedule" :
+                  item.processingStatus.status === "completed" ? "check_circle" :
+                  "error"
+                }
+                size={16}
+                color={getProcessingStatusColor(item.processingStatus.status)}
+              />
+              <Text style={styles.processingStatusText}>
+                {item.processingStatus.status === "processing" ? "Processing 3D Model" :
+                 item.processingStatus.status === "queued" ? "Queued for Processing" :
+                 item.processingStatus.status === "completed" ? "Processing Complete" :
+                 "Processing Failed"}
+              </Text>
+            </View>
+            <Text style={styles.processingStatusProgress}>
+              {item.processingStatus.progress}%
+            </Text>
+          </View>
+          
+          {/* Mini Progress Bar */}
+          <View style={styles.miniProgressBarContainer}>
+            <View 
+              style={[
+                styles.miniProgressBarFill, 
+                { 
+                  width: `${item.processingStatus.progress}%`,
+                  backgroundColor: getProcessingStatusColor(item.processingStatus.status)
+                }
+              ]} 
+            />
+          </View>
+
+          {item.processingStatus.message && (
+            <Text style={styles.processingStatusMessage} numberOfLines={1}>
+              {item.processingStatus.message}
+            </Text>
+          )}
+        </View>
+      )}
+
       <View style={styles.projectFooter}>
         <IconSymbol
           ios_icon_name="chevron.right"
@@ -114,21 +279,6 @@ export default function ProjectsScreen() {
       </View>
     </Pressable>
   );
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case "active":
-        return colors.success;
-      case "processing":
-        return colors.warning;
-      case "completed":
-        return colors.primary;
-      case "archived":
-        return colors.textSecondary;
-      default:
-        return colors.textSecondary;
-    }
-  };
 
   if (isLoading) {
     return (
@@ -284,6 +434,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginBottom: 8,
+  },
+  processingStatusContainer: {
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 12,
+    padding: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  processingStatusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  processingStatusTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  processingStatusText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  processingStatusProgress: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  miniProgressBarContainer: {
+    height: 4,
+    backgroundColor: colors.accentBorder,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  miniProgressBarFill: {
+    height: "100%",
+    borderRadius: 2,
+  },
+  processingStatusMessage: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontStyle: "italic",
   },
   projectFooter: {
     flexDirection: "row",

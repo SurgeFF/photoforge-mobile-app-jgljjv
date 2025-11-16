@@ -22,6 +22,7 @@ import {
   getMediaFiles,
   getProcessedModels,
   getAccessKey,
+  checkProcessingStatusMobile,
 } from "@/utils/apiClient";
 
 export default function ProjectDetailScreen() {
@@ -34,10 +35,23 @@ export default function ProjectDetailScreen() {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Processing status polling
+  const [processingStatus, setProcessingStatus] = useState<any>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadProjectData();
   }, [projectId]);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, [pollingInterval]);
 
   const loadProjectData = async () => {
     try {
@@ -64,12 +78,72 @@ export default function ProjectDetailScreen() {
 
       if (modelsResult.success && modelsResult.data) {
         setModels(modelsResult.data);
+        
+        // Check for processing models
+        const processingModel = modelsResult.data.find(
+          (model: any) => model.status === "processing" || model.status === "queued"
+        );
+
+        if (processingModel) {
+          console.log("🔄 Found processing model:", processingModel.id);
+          startStatusPolling(accessKey, processingModel.id);
+        }
       }
     } catch (error) {
       console.error("Error loading project data:", error);
       Alert.alert("Error", "Failed to load project data");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const startStatusPolling = (accessKey: string, modelId: string) => {
+    // Poll immediately
+    checkStatus(accessKey, modelId);
+
+    // Then poll every 5 seconds
+    const interval = setInterval(() => {
+      checkStatus(accessKey, modelId);
+    }, 5000);
+
+    setPollingInterval(interval);
+  };
+
+  const checkStatus = async (accessKey: string, modelId: string) => {
+    try {
+      const result = await checkProcessingStatusMobile(accessKey, modelId);
+      
+      if (result.success && result.data) {
+        console.log("📊 Processing status:", result.data.status, "-", result.data.progress + "%");
+        setProcessingStatus(result.data);
+
+        // Stop polling if completed or failed
+        if (result.data.status === "completed" || result.data.status === "failed") {
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+            setPollingInterval(null);
+          }
+
+          if (result.data.status === "completed") {
+            Alert.alert(
+              "Processing Complete! 🎉",
+              "Your 3D model has been successfully processed and is ready to view.",
+              [
+                {
+                  text: "Refresh",
+                  onPress: () => loadProjectData(),
+                },
+                {
+                  text: "OK",
+                  style: "cancel",
+                },
+              ]
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("❌ Error checking status:", error);
     }
   };
 
@@ -86,6 +160,21 @@ export default function ProjectDetailScreen() {
     } catch (error) {
       console.error("❌ Navigation error:", error);
       Alert.alert("Error", "Failed to navigate to flight planning");
+    }
+  };
+
+  const getProcessingStatusColor = (status: string) => {
+    switch (status) {
+      case "queued":
+        return colors.textSecondary;
+      case "processing":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "failed":
+        return colors.error;
+      default:
+        return colors.textSecondary;
     }
   };
 
@@ -139,6 +228,60 @@ export default function ProjectDetailScreen() {
             )}
             {project.description && (
               <Text style={styles.description}>{project.description}</Text>
+            )}
+          </View>
+        )}
+
+        {/* Processing Status Bar */}
+        {processingStatus && (
+          <View style={styles.statusCard}>
+            <View style={styles.statusHeader}>
+              <View style={styles.statusTitleRow}>
+                <IconSymbol
+                  ios_icon_name={
+                    processingStatus.status === "processing" ? "gearshape.fill" :
+                    processingStatus.status === "queued" ? "clock.fill" :
+                    processingStatus.status === "completed" ? "checkmark.circle.fill" :
+                    "xmark.circle.fill"
+                  }
+                  android_material_icon_name={
+                    processingStatus.status === "processing" ? "settings" :
+                    processingStatus.status === "queued" ? "schedule" :
+                    processingStatus.status === "completed" ? "check_circle" :
+                    "error"
+                  }
+                  size={24}
+                  color={getProcessingStatusColor(processingStatus.status)}
+                />
+                <Text style={styles.statusTitle}>
+                  {processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1)}
+                </Text>
+              </View>
+              <Text style={styles.statusProgress}>{processingStatus.progress}%</Text>
+            </View>
+            
+            {/* Progress Bar */}
+            <View style={styles.progressBarContainer}>
+              <View 
+                style={[
+                  styles.progressBarFill, 
+                  { 
+                    width: `${processingStatus.progress}%`,
+                    backgroundColor: getProcessingStatusColor(processingStatus.status)
+                  }
+                ]} 
+              />
+            </View>
+
+            {processingStatus.message && (
+              <Text style={styles.statusMessage}>{processingStatus.message}</Text>
+            )}
+
+            {processingStatus.status === "processing" && (
+              <View style={styles.statusSpinner}>
+                <ActivityIndicator size="small" color={colors.warning} />
+                <Text style={styles.statusSpinnerText}>Processing in progress...</Text>
+              </View>
             )}
           </View>
         )}
@@ -321,6 +464,62 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textSecondary,
     lineHeight: 24,
+  },
+  statusCard: {
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  statusHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statusTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  statusTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  statusProgress: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.primary,
+  },
+  progressBarContainer: {
+    height: 8,
+    backgroundColor: colors.accentBorder,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  statusMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  statusSpinner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  statusSpinnerText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: "italic",
   },
   statsContainer: {
     flexDirection: "row",
