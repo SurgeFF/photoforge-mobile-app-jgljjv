@@ -113,7 +113,11 @@ export default function ProjectsScreen() {
               if (statusResult.success && statusResult.data) {
                 return {
                   ...project,
-                  processingStatus: statusResult.data,
+                  processingStatus: {
+                    status: statusResult.data.status,
+                    progress: statusResult.data.progress || 0,
+                    message: statusResult.data.status_message || statusResult.data.message,
+                  },
                 };
               }
             }
@@ -244,7 +248,7 @@ export default function ProjectsScreen() {
               </Text>
             </View>
             <Text style={styles.processingStatusProgress}>
-              {item.processingStatus.progress}%
+              {item.processingStatus.progress || 0}%
             </Text>
           </View>
           
@@ -254,7 +258,7 @@ export default function ProjectsScreen() {
               style={[
                 styles.miniProgressBarFill, 
                 { 
-                  width: `${item.processingStatus.progress}%`,
+                  width: `${item.processingStatus.progress || 0}%`,
                   backgroundColor: getProcessingStatusColor(item.processingStatus.status)
                 }
               ]} 

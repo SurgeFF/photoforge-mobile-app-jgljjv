@@ -22,6 +22,7 @@ import Button from "@/components/button";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { validateAccessKey, getProjects, checkProcessingStatusMobile, getProcessedModels } from "@/utils/apiClient";
 import { initializeAnalytics, trackScreenView, trackLogin, trackLogout, trackEvent } from "@/utils/analytics";
+import Constants from "expo-constants";
 
 interface FeatureCardProps {
   icon: string;
@@ -53,6 +54,9 @@ export default function HomeScreen() {
   const [projectCount, setProjectCount] = useState(0);
   const [processingProjects, setProcessingProjects] = useState<ProcessingProject[]>([]);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
+
+  // Get app version from app.json
+  const appVersion = Constants.expoConfig?.version || "1.0.0";
 
   useEffect(() => {
     // Initialize analytics on app start
@@ -100,8 +104,8 @@ export default function HomeScreen() {
             return {
               ...project,
               status: result.data.status,
-              progress: result.data.progress,
-              message: result.data.message,
+              progress: result.data.progress || 0,
+              message: result.data.status_message || result.data.message,
             };
           }
         } catch (error) {
@@ -138,8 +142,8 @@ export default function HomeScreen() {
                     name: project.name,
                     modelId: processingModel.id,
                     status: statusResult.data.status,
-                    progress: statusResult.data.progress,
-                    message: statusResult.data.message,
+                    progress: statusResult.data.progress || 0,
+                    message: statusResult.data.status_message || statusResult.data.message,
                   });
                 }
               }
@@ -358,6 +362,12 @@ export default function HomeScreen() {
             </View>
           </View>
 
+          {/* Copyright Notices */}
+          <View style={styles.copyrightSection}>
+            <Text style={styles.copyrightText}>© DronE1337 - All rights reserved</Text>
+            <Text style={styles.copyrightText}>© PhotoForge - All rights reserved</Text>
+          </View>
+
           {/* Privacy Policy Link */}
           <Pressable onPress={handlePrivacyPolicy} style={styles.privacyPolicyContainer}>
             <Text style={styles.privacyPolicyText}>Privacy Policy</Text>
@@ -544,6 +554,15 @@ export default function HomeScreen() {
         >
           Logout
         </Button>
+
+        {/* Version and Copyright Section */}
+        <View style={styles.footerSection}>
+          <Text style={styles.versionText}>Version {appVersion}</Text>
+          <View style={styles.copyrightSection}>
+            <Text style={styles.copyrightText}>© DronE1337 - All rights reserved</Text>
+            <Text style={styles.copyrightText}>© PhotoForge - All rights reserved</Text>
+          </View>
+        </View>
 
         {/* Privacy Policy Link */}
         <Pressable onPress={handlePrivacyPolicy} style={styles.privacyPolicyContainer}>
@@ -825,6 +844,28 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 8,
+  },
+  footerSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: colors.accentBorder,
+    alignItems: "center",
+  },
+  versionText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  copyrightSection: {
+    alignItems: "center",
+    gap: 8,
+  },
+  copyrightText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
   privacyPolicyContainer: {
     alignItems: "center",

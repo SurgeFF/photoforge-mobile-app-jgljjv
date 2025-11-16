@@ -426,7 +426,9 @@ export default function ProjectDetailScreen() {
                   color={getProcessingStatusColor(processingStatus.status)}
                 />
                 <Text style={styles.statusTitle}>
-                  {processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1)}
+                  {processingStatus.status ? 
+                    processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1) : 
+                    "Unknown"}
                 </Text>
               </View>
               <Text style={styles.statusProgress}>{processingStatus.progress || 0}%</Text>
