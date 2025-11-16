@@ -86,6 +86,31 @@ export interface ProjectDetail {
   models: ProcessedModel[];
 }
 
+export interface MediaUploadResponse {
+  success: boolean;
+  data?: {
+    id: string;
+    project_id: string;
+    file_url: string;
+    file_name: string;
+    file_type: string;
+  };
+  error?: string;
+}
+
+export interface BatchUploadResponse {
+  success: boolean;
+  data?: {
+    uploaded_count: number;
+    failed_count: number;
+    errors: Array<{
+      file_name: string;
+      error: string;
+    }>;
+  };
+  error?: string;
+}
+
 export async function getAccessKey(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
@@ -469,6 +494,152 @@ export async function getProcessedModels(accessKey: string, projectId: string): 
     }
   } catch (error) {
     console.error("❌ Get processed models error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+// ==================== MEDIA UPLOAD ====================
+
+/**
+ * Upload single media file to project
+ */
+export async function uploadMediaMobile(
+  accessKey: string,
+  projectId: string,
+  file: {
+    uri: string;
+    name: string;
+    type: string;
+  },
+  metadata?: any
+): Promise<MediaUploadResponse> {
+  try {
+    console.log("\n========== UPLOADING MEDIA FILE ==========");
+    console.log("📤 Uploading single file to project:", projectId);
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/uploadMediaMobile`);
+    console.log("📁 File name:", file.name);
+    console.log("📄 File type:", file.type);
+    
+    const formData = new FormData();
+    formData.append('access_key', accessKey);
+    formData.append('project_id', projectId);
+    formData.append('file', {
+      uri: file.uri,
+      name: file.name,
+      type: file.type,
+    } as any);
+    formData.append('file_name', file.name);
+    formData.append('file_type', file.type);
+    
+    if (metadata) {
+      formData.append('metadata', JSON.stringify(metadata));
+    }
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/uploadMediaMobile`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
+    
+    if (response.ok && data.success) {
+      console.log("✅ File uploaded successfully");
+      console.log("========== UPLOAD SUCCESS ==========\n");
+      return { success: true, data: data.data };
+    } else {
+      const errorMsg = data.error || "Failed to upload file";
+      console.log("❌ Upload failed:", errorMsg);
+      console.log("========== UPLOAD FAILED ==========\n");
+      return { success: false, error: errorMsg };
+    }
+  } catch (error) {
+    console.error("❌ EXCEPTION during uploadMediaMobile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Upload multiple media files to project in batch
+ * Note: Max 250 files per batch
+ */
+export async function uploadMediaBatchMobile(
+  accessKey: string,
+  projectId: string,
+  files: Array<{
+    uri: string;
+    name: string;
+    type: string;
+    metadata?: any;
+  }>
+): Promise<BatchUploadResponse> {
+  try {
+    console.log("\n========== UPLOADING MEDIA BATCH ==========");
+    console.log("📤 Uploading batch of files to project:", projectId);
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/uploadMediaBatchMobile`);
+    console.log("📁 File count:", files.length);
+    
+    if (files.length > 250) {
+      console.warn("⚠️ File count exceeds 250 limit, truncating...");
+      files = files.slice(0, 250);
+    }
+    
+    const formData = new FormData();
+    formData.append('access_key', accessKey);
+    formData.append('project_id', projectId);
+    
+    files.forEach((file, index) => {
+      formData.append(`file_${index}`, {
+        uri: file.uri,
+        name: file.name,
+        type: file.type,
+      } as any);
+      formData.append(`file_name_${index}`, file.name);
+      formData.append(`file_type_${index}`, file.type);
+      
+      if (file.metadata) {
+        formData.append(`metadata_${index}`, JSON.stringify(file.metadata));
+      }
+    });
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/uploadMediaBatchMobile`, {
+      method: "POST",
+      body: formData,
+      headers: {
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
+    
+    if (response.ok && data.success) {
+      console.log("✅ Batch upload completed");
+      console.log("   - Uploaded:", data.data?.uploaded_count || 0);
+      console.log("   - Failed:", data.data?.failed_count || 0);
+      console.log("========== BATCH UPLOAD SUCCESS ==========\n");
+      return { success: true, data: data.data };
+    } else {
+      const errorMsg = data.error || "Failed to upload batch";
+      console.log("❌ Batch upload failed:", errorMsg);
+      console.log("========== BATCH UPLOAD FAILED ==========\n");
+      return { success: false, error: errorMsg };
+    }
+  } catch (error) {
+    console.error("❌ EXCEPTION during uploadMediaBatchMobile:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",

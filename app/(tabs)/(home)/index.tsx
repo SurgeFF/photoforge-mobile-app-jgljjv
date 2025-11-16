@@ -401,7 +401,7 @@ export default function HomeScreen() {
 
           <FeatureCard
             icon="headphones"
-            androidIcon="support_agent"
+            androidIcon="headset_mic"
             title="Support"
             description="Get help and submit tickets"
             onPress={() => router.push("/support")}

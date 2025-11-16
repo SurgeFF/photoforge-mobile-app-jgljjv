@@ -12,12 +12,14 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { IconSymbol } from "@/components/IconSymbol";
 import { colors } from "@/styles/commonStyles";
-import { uploadFile } from "@/utils/apiClient";
+import { uploadMediaMobile, uploadMediaBatchMobile, getAccessKey } from "@/utils/apiClient";
 
 interface MediaUploadZoneProps {
   projectId: string;
   onUploadComplete: (files: any[]) => void;
 }
+
+const MAX_FILES = 250;
 
 export default function MediaUploadZone({
   projectId,
@@ -25,6 +27,7 @@ export default function MediaUploadZone({
 }: MediaUploadZoneProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState("");
 
   const handleSelectImages = async () => {
     try {
@@ -46,7 +49,14 @@ export default function MediaUploadZone({
       });
 
       if (!result.canceled && result.assets) {
-        await uploadImages(result.assets);
+        if (result.assets.length > MAX_FILES) {
+          Alert.alert(
+            "Too Many Files",
+            `You can upload a maximum of ${MAX_FILES} files at once. Only the first ${MAX_FILES} files will be uploaded.`,
+            [{ text: "OK" }]
+          );
+        }
+        await uploadImages(result.assets.slice(0, MAX_FILES));
       }
     } catch (error) {
       console.error("Error selecting images:", error);
@@ -57,51 +67,109 @@ export default function MediaUploadZone({
   const uploadImages = async (assets: any[]) => {
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadStatus("Preparing upload...");
 
     try {
-      const uploadedFiles = [];
-      const totalFiles = assets.length;
-
-      for (let i = 0; i < assets.length; i++) {
-        const asset = assets[i];
-        console.log(`[MediaUpload] Uploading image ${i + 1}/${totalFiles}`);
-
-        // Create file object for upload
-        const file = {
-          uri: asset.uri,
-          name: asset.fileName || `image_${Date.now()}_${i}.jpg`,
-          type: asset.type || "image/jpeg",
-        };
-
-        const result = await uploadFile(file);
-
-        if (result.success && result.file_url) {
-          uploadedFiles.push({
-            file_url: result.file_url,
-            project_id: projectId,
-            exif_data: asset.exif || {},
-            width: asset.width,
-            height: asset.height,
-          });
-        }
-
-        setUploadProgress(((i + 1) / totalFiles) * 100);
+      const accessKey = await getAccessKey();
+      if (!accessKey) {
+        Alert.alert("Error", "Please login first");
+        return;
       }
 
-      console.log(
-        `[MediaUpload] Successfully uploaded ${uploadedFiles.length} files`
-      );
-      onUploadComplete(uploadedFiles);
-      Alert.alert(
-        "Success",
-        `Uploaded ${uploadedFiles.length} image${uploadedFiles.length > 1 ? "s" : ""} successfully`
-      );
+      const totalFiles = assets.length;
+      console.log(`[MediaUpload] Starting upload of ${totalFiles} files to project ${projectId}`);
+
+      // Prepare files for batch upload
+      const files = assets.map((asset, index) => ({
+        uri: asset.uri,
+        name: asset.fileName || `image_${Date.now()}_${index}.jpg`,
+        type: asset.type || "image/jpeg",
+        metadata: {
+          width: asset.width,
+          height: asset.height,
+          exif: asset.exif || {},
+        },
+      }));
+
+      setUploadStatus(`Uploading ${totalFiles} files...`);
+
+      // Use batch upload for multiple files
+      if (files.length > 1) {
+        const result = await uploadMediaBatchMobile(accessKey, projectId, files);
+
+        if (result.success && result.data) {
+          const { uploaded_count, failed_count, errors } = result.data;
+          
+          console.log(`[MediaUpload] Batch upload completed:`);
+          console.log(`  - Uploaded: ${uploaded_count}`);
+          console.log(`  - Failed: ${failed_count}`);
+          
+          if (errors && errors.length > 0) {
+            console.log(`  - Errors:`, errors);
+          }
+
+          setUploadProgress(100);
+          
+          // Show result to user
+          if (failed_count > 0) {
+            Alert.alert(
+              "Upload Completed with Errors",
+              `Successfully uploaded ${uploaded_count} of ${totalFiles} files.\n${failed_count} files failed to upload.`,
+              [{ text: "OK" }]
+            );
+          } else {
+            Alert.alert(
+              "Success",
+              `Successfully uploaded all ${uploaded_count} files!`,
+              [{ text: "OK" }]
+            );
+          }
+
+          // Notify parent component to refresh
+          onUploadComplete([]);
+        } else {
+          throw new Error(result.error || "Batch upload failed");
+        }
+      } else if (files.length === 1) {
+        // Use single upload for one file
+        const file = files[0];
+        setUploadStatus("Uploading file...");
+        
+        const result = await uploadMediaMobile(
+          accessKey,
+          projectId,
+          file,
+          file.metadata
+        );
+
+        if (result.success && result.data) {
+          console.log(`[MediaUpload] Single file uploaded successfully`);
+          setUploadProgress(100);
+          
+          Alert.alert(
+            "Success",
+            "File uploaded successfully!",
+            [{ text: "OK" }]
+          );
+
+          // Notify parent component to refresh
+          onUploadComplete([result.data]);
+        } else {
+          throw new Error(result.error || "Upload failed");
+        }
+      }
     } catch (error) {
       console.error("Error uploading images:", error);
-      Alert.alert("Error", "Failed to upload some images");
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      Alert.alert(
+        "Upload Failed",
+        `Failed to upload images: ${errorMessage}`,
+        [{ text: "OK" }]
+      );
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      setUploadStatus("");
     }
   };
 
@@ -115,9 +183,10 @@ export default function MediaUploadZone({
         {isUploading ? (
           <View style={styles.uploadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.uploadingText}>
-              Uploading... {Math.round(uploadProgress)}%
-            </Text>
+            <Text style={styles.uploadingText}>{uploadStatus}</Text>
+            {uploadProgress > 0 && (
+              <Text style={styles.progressText}>{Math.round(uploadProgress)}%</Text>
+            )}
           </View>
         ) : (
           <>
@@ -129,7 +198,7 @@ export default function MediaUploadZone({
             />
             <Text style={styles.uploadTitle}>Upload Drone Images</Text>
             <Text style={styles.uploadSubtitle}>
-              Tap to select 50-500+ images with GPS data
+              Tap to select images with GPS data
             </Text>
             <View style={styles.infoBox}>
               <IconSymbol
@@ -139,7 +208,7 @@ export default function MediaUploadZone({
                 color={colors.textSecondary}
               />
               <Text style={styles.infoText}>
-                Images should have GPS/EXIF data for best results
+                Max {MAX_FILES} files per upload. Images should have GPS/EXIF data for best results.
               </Text>
             </View>
           </>
@@ -199,5 +268,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
+    textAlign: "center",
+  },
+  progressText: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
 });
