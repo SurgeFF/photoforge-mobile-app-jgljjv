@@ -1,7 +1,7 @@
 
-# Analytics Setup Guide
+# Analytics & Crashlytics Setup Guide
 
-This app integrates **Firebase Analytics** and **Amplitude** for comprehensive analytics tracking.
+This app integrates **Firebase Analytics**, **Firebase Crashlytics**, and **Amplitude** for comprehensive analytics tracking and crash reporting.
 
 ## Firebase Setup
 
@@ -27,18 +27,27 @@ This app integrates **Firebase Analytics** and **Amplitude** for comprehensive a
 
 ### 4. Configure app.json
 
-Add the Firebase plugin to your `app.json`:
+Add the Firebase plugins to your `app.json`:
 
 ```json
 {
   "expo": {
+    "ios": {
+      "googleServicesFile": "./GoogleService-Info.plist"
+    },
+    "android": {
+      "googleServicesFile": "./google-services.json"
+    },
     "plugins": [
       "@react-native-firebase/app",
-      "@react-native-firebase/analytics"
+      "@react-native-firebase/analytics",
+      "@react-native-firebase/crashlytics"
     ]
   }
 }
 ```
+
+**Note**: The configuration has already been added to `app.json`.
 
 ### 5. Rebuild Your App
 
@@ -49,6 +58,36 @@ npx expo prebuild
 npx expo run:ios
 npx expo run:android
 ```
+
+## Firebase Crashlytics
+
+Firebase Crashlytics is automatically initialized with Firebase Analytics. It provides:
+
+- **Automatic crash reporting** for JavaScript and native crashes
+- **Custom error logging** for non-fatal errors
+- **User context** tracking (user ID, custom attributes)
+- **Real-time crash alerts**
+
+### Usage
+
+```typescript
+import { logError, logMessage, setAttribute } from '@/utils/crashlytics';
+
+// Log a non-fatal error
+try {
+  // Some code
+} catch (error) {
+  logError(error as Error, 'Context information');
+}
+
+// Log a custom message
+logMessage('User completed important action');
+
+// Set custom attributes
+setAttribute('drone_model', 'DJI Mavic 3');
+```
+
+For detailed Crashlytics setup, see `FIREBASE_CRASHLYTICS_SETUP.md`.
 
 ## Amplitude Setup
 
@@ -187,9 +226,16 @@ When deploying to production:
 3. Test analytics in production build before releasing
 4. Monitor analytics dashboards for any issues
 
+## Additional Documentation
+
+- **Firebase Crashlytics Setup**: See `FIREBASE_CRASHLYTICS_SETUP.md` for detailed Crashlytics configuration
+- **Firebase Configuration**: See `firebase-config.md` for Firebase project details
+- **Webapp Integration**: See `WEBAPP_INTEGRATION_NOTES.md` for backend integration details
+
 ## Support
 
 For issues with:
 - **Firebase**: [Firebase Support](https://firebase.google.com/support)
+- **Firebase Crashlytics**: [Crashlytics Documentation](https://firebase.google.com/docs/crashlytics)
 - **Amplitude**: [Amplitude Support](https://help.amplitude.com/)
 - **App Integration**: Submit a support ticket in the app

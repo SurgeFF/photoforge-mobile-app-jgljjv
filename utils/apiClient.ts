@@ -5,6 +5,7 @@
  * This utility provides functions to interact with the PhotoForge backend API.
  * 
  * Base URL: https://photoforge.base44.app
+ * Firebase Storage: gs://gen-lang-client-0688382477.firebasestorage.app
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,6 +15,9 @@ const FUNCTIONS_BASE = `${WEBAPP_URL}/api/functions`;
 const ENTITIES_BASE = `${WEBAPP_URL}/api/entities`;
 const INTEGRATIONS_BASE = `${WEBAPP_URL}/api/integrations`;
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
+
+// Firebase Storage configuration
+export const FIREBASE_STORAGE_BUCKET = "gs://gen-lang-client-0688382477.firebasestorage.app";
 
 export interface ApiResponse<T> {
   success: boolean;

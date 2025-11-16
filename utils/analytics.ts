@@ -1,6 +1,7 @@
 
 import * as amplitude from '@amplitude/analytics-react-native';
 import analytics from '@react-native-firebase/analytics';
+import { initializeCrashlytics, setUserId as setCrashlyticsUserId, setAttribute } from './crashlytics';
 
 // Initialize analytics services
 let isInitialized = false;
@@ -22,6 +23,9 @@ export const initializeAnalytics = async (amplitudeApiKey?: string) => {
 
     // Firebase Analytics is automatically initialized with the app
     console.log('✅ Firebase Analytics ready');
+
+    // Initialize Crashlytics
+    await initializeCrashlytics();
 
     isInitialized = true;
   } catch (error) {
@@ -77,6 +81,8 @@ export const trackLogin = async (method: string, userId?: string) => {
     if (userId) {
       await analytics().setUserId(userId);
       amplitude.setUserId(userId);
+      // Set user ID in Crashlytics as well
+      setCrashlyticsUserId(userId);
     }
 
     console.log(`📊 Login tracked: ${method}`);
@@ -135,6 +141,9 @@ export const trackDroneConnection = async (connectionType: string, success: bool
       connection_type: connectionType,
       success,
     });
+    
+    // Set Crashlytics attribute for drone connection
+    setAttribute('last_drone_connection', connectionType);
   } catch (error) {
     console.error('Error tracking drone connection:', error);
   }
