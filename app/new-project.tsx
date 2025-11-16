@@ -64,21 +64,11 @@ export default function NewProjectScreen() {
         const projectId = result.data.id;
         const projectName = result.data.name;
         
-        Alert.alert(
-          "Success",
-          "Project created successfully!",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                router.replace({
-                  pathname: "/project-detail",
-                  params: { projectId, projectName },
-                });
-              },
-            },
-          ]
-        );
+        // Navigate immediately without showing alert
+        router.replace({
+          pathname: "/project-detail",
+          params: { projectId, projectName },
+        });
       } else {
         Alert.alert("Error", result.error || "Failed to create project");
       }

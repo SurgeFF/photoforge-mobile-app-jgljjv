@@ -30,8 +30,14 @@ export function IconSymbol({
   style?: StyleProp<ViewStyle>;
   weight?: SymbolWeight;
 }) {
-  // Ensure we have a valid Material Icon name
-  const iconName = android_material_icon_name || "help_outline";
+  // Ensure we have a valid Material Icon name, fallback to help_outline if invalid
+  let iconName = android_material_icon_name;
+  
+  // Check if the icon name exists in MaterialIcons glyphMap
+  if (!MaterialIcons.glyphMap[iconName]) {
+    console.warn(`[IconSymbol] Invalid Material Icon name: ${iconName}, using help_outline as fallback`);
+    iconName = "help_outline";
+  }
   
   return (
     <MaterialIcons

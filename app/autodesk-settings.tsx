@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Platform,
   Pressable,
   Switch,
+  Modal,
+  FlatList,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -18,13 +20,27 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { autodeskRealityCapture, getAccessKey } from "@/utils/apiClient";
+import { autodeskRealityCapture, getAccessKey, getProjectsMobile } from "@/utils/apiClient";
+
+interface Project {
+  id: string;
+  name: string;
+  location?: string;
+  status: string;
+}
 
 export default function AutodeskSettingsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams();
-  const projectId = params.projectId as string;
-  const projectName = params.projectName as string;
+  const initialProjectId = params.projectId as string;
+  const initialProjectName = params.projectName as string;
+
+  // Project selection
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId || "");
+  const [selectedProjectName, setSelectedProjectName] = useState(initialProjectName || "");
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [showProjectPicker, setShowProjectPicker] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   // Quality Settings
   const [quality, setQuality] = useState<"low" | "medium" | "high" | "ultra">("high");
@@ -47,9 +63,40 @@ export default function AutodeskSettingsScreen() {
   
   const [isProcessing, setIsProcessing] = useState(false);
 
+  useEffect(() => {
+    loadProjects();
+  }, []);
+
+  const loadProjects = async () => {
+    setLoadingProjects(true);
+    try {
+      const accessKey = await getAccessKey();
+      if (!accessKey) {
+        console.log("[AutodeskSettings] No access key found");
+        return;
+      }
+
+      const result = await getProjectsMobile(accessKey);
+      if (result.success && result.data) {
+        setProjects(result.data);
+        console.log("[AutodeskSettings] Loaded projects:", result.data.length);
+      }
+    } catch (error) {
+      console.error("[AutodeskSettings] Error loading projects:", error);
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const handleProjectSelect = (project: Project) => {
+    setSelectedProjectId(project.id);
+    setSelectedProjectName(project.name);
+    setShowProjectPicker(false);
+  };
+
   const handleStartProcessing = async () => {
-    if (!projectId) {
-      Alert.alert("Error", "No project selected");
+    if (!selectedProjectId) {
+      Alert.alert("Error", "Please select a project");
       return;
     }
 
@@ -92,7 +139,7 @@ export default function AutodeskSettingsScreen() {
       console.log("[AutodeskSettings] Starting 3D processing with settings:", processingSettings);
 
       const result = await autodeskRealityCapture({
-        project_id: projectId,
+        project_id: selectedProjectId,
         image_urls: [], // Will be fetched from project media files on backend
         processing_settings: processingSettings,
       });
@@ -152,17 +199,32 @@ export default function AutodeskSettingsScreen() {
           Configure Autodesk Reality Capture settings for 3D model generation
         </Text>
 
-        {projectName && (
-          <View style={styles.projectInfo}>
+        {/* Project Selection */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Select Project</Text>
+          <Pressable
+            style={styles.projectSelector}
+            onPress={() => setShowProjectPicker(true)}
+          >
+            <View style={styles.projectSelectorContent}>
+              <IconSymbol
+                ios_icon_name="folder.fill"
+                android_material_icon_name="folder"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={styles.projectSelectorText}>
+                {selectedProjectName || "Choose a project..."}
+              </Text>
+            </View>
             <IconSymbol
-              ios_icon_name="folder.fill"
-              android_material_icon_name="folder"
-              size={20}
-              color={colors.primary}
+              ios_icon_name="chevron.down"
+              android_material_icon_name="arrow_drop_down"
+              size={24}
+              color={colors.textSecondary}
             />
-            <Text style={styles.projectName}>{projectName}</Text>
-          </View>
-        )}
+          </Pressable>
+        </View>
 
         {/* Quality Settings */}
         <View style={styles.formSection}>
@@ -424,11 +486,12 @@ export default function AutodeskSettingsScreen() {
             color={colors.primary}
           />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Processing Time</Text>
+            <Text style={styles.infoTitle}>Processing Information</Text>
             <Text style={styles.infoText}>
-              Processing time varies based on quality settings and number of images (50-500+). 
-              You&apos;ll receive a notification when processing is complete. You can leave this 
-              page and continue using the app.
+              • Processing time varies based on quality and image count{'\n'}
+              • Maximum 250 files per processing job{'\n'}
+              • You&apos;ll receive a notification when complete{'\n'}
+              • You can leave this page and continue using the app
             </Text>
           </View>
         </View>
@@ -436,12 +499,89 @@ export default function AutodeskSettingsScreen() {
         <Button
           onPress={handleStartProcessing}
           loading={isProcessing}
-          disabled={isProcessing}
+          disabled={isProcessing || !selectedProjectId}
           style={styles.processButton}
         >
           {isProcessing ? "Starting Processing..." : "Start 3D Processing"}
         </Button>
       </ScrollView>
+
+      {/* Project Picker Modal */}
+      <Modal
+        visible={showProjectPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowProjectPicker(false)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setShowProjectPicker(false)}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Project</Text>
+              <Pressable
+                onPress={() => setShowProjectPicker(false)}
+                style={styles.modalCloseButton}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark"
+                  android_material_icon_name="close"
+                  size={24}
+                  color={colors.textPrimary}
+                />
+              </Pressable>
+            </View>
+            {loadingProjects ? (
+              <View style={styles.modalLoading}>
+                <Text style={styles.modalLoadingText}>Loading projects...</Text>
+              </View>
+            ) : projects.length === 0 ? (
+              <View style={styles.modalEmpty}>
+                <Text style={styles.modalEmptyText}>No projects found</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={projects}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <Pressable
+                    style={[
+                      styles.projectItem,
+                      selectedProjectId === item.id && styles.projectItemSelected,
+                    ]}
+                    onPress={() => handleProjectSelect(item)}
+                  >
+                    <View style={styles.projectItemContent}>
+                      <IconSymbol
+                        ios_icon_name="folder.fill"
+                        android_material_icon_name="folder"
+                        size={24}
+                        color={selectedProjectId === item.id ? colors.primary : colors.textSecondary}
+                      />
+                      <View style={styles.projectItemText}>
+                        <Text style={styles.projectItemName}>{item.name}</Text>
+                        {item.location && (
+                          <Text style={styles.projectItemLocation}>{item.location}</Text>
+                        )}
+                      </View>
+                    </View>
+                    {selectedProjectId === item.id && (
+                      <IconSymbol
+                        ios_icon_name="checkmark.circle.fill"
+                        android_material_icon_name="check_circle"
+                        size={24}
+                        color={colors.primary}
+                      />
+                    )}
+                  </Pressable>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -492,21 +632,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 24,
   },
-  projectInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 12,
-    backgroundColor: colors.surface + "CC",
-    borderRadius: 12,
-    marginBottom: 24,
-    gap: 8,
-  },
-  projectName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
   formSection: {
     marginBottom: 32,
   },
@@ -515,6 +640,27 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.textPrimary,
     marginBottom: 16,
+  },
+  projectSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  projectSelectorContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  projectSelectorText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
   },
   inputGroup: {
     marginBottom: 20,
@@ -615,5 +761,82 @@ const styles = StyleSheet.create({
   },
   processButton: {
     marginTop: 16,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "70%",
+    paddingBottom: Platform.OS === "android" ? 24 : 0,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalLoading: {
+    padding: 40,
+    alignItems: "center",
+  },
+  modalLoadingText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  modalEmpty: {
+    padding: 40,
+    alignItems: "center",
+  },
+  modalEmptyText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+  },
+  projectItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+  },
+  projectItemSelected: {
+    backgroundColor: colors.primary + "10",
+  },
+  projectItemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  projectItemText: {
+    flex: 1,
+  },
+  projectItemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  projectItemLocation: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 2,
   },
 });

@@ -65,6 +65,14 @@ export default function SubscriptionScreen() {
     }
   };
 
+  const handleUpgrade = () => {
+    Alert.alert(
+      "Square Payment Integration Required",
+      "To process subscription payments, Square Web Payments SDK needs to be integrated.\n\nThis requires:\n\n- Square Application ID\n- Square Location ID\n- Web Payments SDK initialization\n- Payment form with card input\n- Recurring payment setup\n\nPlease contact the developer to complete the Square integration for subscriptions.",
+      [{ text: "OK" }]
+    );
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -169,15 +177,10 @@ export default function SubscriptionScreen() {
 
         <View style={styles.actionsSection}>
           <Button
-            onPress={() => {
-              Alert.alert(
-                "Upgrade",
-                "Visit PhotoForge.base44.app to manage your subscription"
-              );
-            }}
+            onPress={handleUpgrade}
             style={styles.actionButton}
           >
-            Manage Subscription
+            Upgrade Subscription
           </Button>
 
           <Button
@@ -202,8 +205,7 @@ export default function SubscriptionScreen() {
             color={colors.primary}
           />
           <Text style={styles.infoText}>
-            To upgrade or manage your subscription, please visit the PhotoForge web
-            app at PhotoForge.base44.app
+            Subscription payments are processed securely through Square. Square integration is currently being configured for recurring payments.
           </Text>
         </View>
       </ScrollView>

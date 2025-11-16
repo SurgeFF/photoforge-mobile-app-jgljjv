@@ -176,8 +176,20 @@ export default function GalleryScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container}>
         <TopographicBackground />
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow_back"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </Pressable>
+          <Text style={styles.headerTitle}>Gallery</Text>
+          <View style={styles.placeholder} />
+        </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>Loading gallery...</Text>
@@ -187,18 +199,33 @@ export default function GalleryScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container}>
       <TopographicBackground />
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow_back"
+            size={24}
+            color={colors.textPrimary}
+          />
+        </Pressable>
+        <Text style={styles.headerTitle}>Gallery</Text>
+        <View style={styles.placeholder} />
+      </View>
+
       <View style={styles.content}>
-        <View style={styles.header}>
+        <View style={styles.headerSection}>
           <IconSymbol
             ios_icon_name="photo.stack"
             android_material_icon_name="collections"
             size={48}
             color={colors.primary}
           />
-          <Text style={styles.title}>Gallery</Text>
-          <Text style={styles.subtitle}>Your created images</Text>
+          <Text style={styles.title}>Your Images</Text>
+          <Text style={styles.subtitle}>
+            {images.length} {images.length === 1 ? "image" : "images"}
+          </Text>
         </View>
 
         {images.length === 0 ? (
@@ -234,11 +261,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.backgroundLight,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === "android" ? 48 : 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    flex: 1,
+    textAlign: "center",
+  },
+  placeholder: {
+    width: 40,
+  },
   content: {
     flex: 1,
     paddingTop: Platform.OS === "android" ? 24 : 0,
   },
-  header: {
+  headerSection: {
     alignItems: "center",
     paddingHorizontal: 24,
     marginBottom: 24,

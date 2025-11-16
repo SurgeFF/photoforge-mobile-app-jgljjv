@@ -33,7 +33,7 @@ export default function DonateScreen() {
   const handleDonate = async () => {
     const amount = selectedAmount || parseFloat(customAmount);
 
-    if (!amount || amount <= 0) {
+    if (!amount || amount <= 0 || isNaN(amount)) {
       Alert.alert("Error", "Please enter a valid donation amount");
       return;
     }
@@ -57,28 +57,11 @@ export default function DonateScreen() {
       console.log("[Donate] Amount:", amount);
       console.log("[Donate] Email:", donorEmail);
 
-      // Generate a unique idempotency key for this transaction
-      const idempotencyKey = `donate_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
-      // Note: In a real implementation, you would need to integrate Square's Web Payments SDK
-      // to generate a payment nonce. For now, we'll show a placeholder.
+      // Note: Square Web Payments SDK integration required
       Alert.alert(
-        "Square Payment Integration",
-        "To complete this donation, you would need to integrate Square's Web Payments SDK to collect payment information securely.\n\nThis would include:\n- Card number\n- Expiration date\n- CVV\n- Billing address\n\nThe Square SDK generates a secure payment nonce that is sent to the server.",
-        [
-          {
-            text: "Learn More",
-            onPress: () => {
-              console.log("[Donate] User wants to learn more about Square integration");
-              Alert.alert(
-                "Square Integration",
-                "Visit square.com/developers to learn how to integrate Square payments into your app.\n\nYou'll need:\n1. Square Developer Account\n2. Application ID\n3. Location ID\n4. Web Payments SDK integration",
-                [{ text: "OK" }]
-              );
-            },
-          },
-          { text: "OK" },
-        ]
+        "Square Payment Integration Required",
+        "To complete donations, Square Web Payments SDK needs to be integrated.\n\nThis requires:\n\n- Square Application ID\n- Square Location ID\n- Web Payments SDK initialization\n- Payment form with card input\n- Tokenization of payment details\n\nThe payment nonce would then be sent to the backend for processing.\n\nPlease contact the developer to complete the Square integration.",
+        [{ text: "OK" }]
       );
 
       // Placeholder for actual Square payment processing
@@ -86,29 +69,29 @@ export default function DonateScreen() {
       //   payment_type: "donation",
       //   amount: amount,
       //   nonce: "PAYMENT_NONCE_FROM_SQUARE_SDK",
-      //   idempotency_key: idempotencyKey,
+      //   idempotency_key: `donate_${Date.now()}_${Math.random().toString(36).substring(7)}`,
       // });
 
-      // if (result.success) {
-      //   Alert.alert(
-      //     "Thank You!",
-      //     `Your donation of $${amount.toFixed(2)} has been processed successfully. We appreciate your support!`,
-      //     [
-      //       {
-      //         text: "OK",
-      //         onPress: () => router.back(),
-      //       },
-      //     ]
-      //   );
-      // } else {
-      //   Alert.alert("Error", result.error || "Payment failed");
-      // }
     } catch (error) {
       console.error("Error processing donation:", error);
       Alert.alert("Error", "Failed to process donation");
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleCustomAmountChange = (text: string) => {
+    // Remove any non-numeric characters except decimal point
+    const cleaned = text.replace(/[^0-9.]/g, '');
+    
+    // Ensure only one decimal point
+    const parts = cleaned.split('.');
+    if (parts.length > 2) {
+      return;
+    }
+    
+    setCustomAmount(cleaned);
+    setSelectedAmount(null);
   };
 
   return (
@@ -182,10 +165,7 @@ export default function DonateScreen() {
                 placeholder="0.00"
                 placeholderTextColor={colors.textSecondary}
                 value={customAmount}
-                onChangeText={(text) => {
-                  setCustomAmount(text);
-                  setSelectedAmount(null);
-                }}
+                onChangeText={handleCustomAmountChange}
                 keyboardType="decimal-pad"
               />
             </View>
@@ -241,9 +221,9 @@ export default function DonateScreen() {
             color={colors.primary}
           />
           <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Secure Payment</Text>
+            <Text style={styles.infoTitle}>Secure Payment via Square</Text>
             <Text style={styles.infoText}>
-              All donations are processed securely through Square. Your payment information is never stored on our servers.
+              All donations are processed securely through Square. Your payment information is never stored on our servers. Square integration is currently being configured.
             </Text>
           </View>
         </View>

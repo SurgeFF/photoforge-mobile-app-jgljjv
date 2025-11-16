@@ -219,6 +219,17 @@ export default function ProcessingWorkflowScreen() {
             <Text style={styles.stepDescription}>
               Upload 50-500+ drone photos with GPS/EXIF data for best results
             </Text>
+            <View style={styles.warningBox}>
+              <IconSymbol
+                ios_icon_name="exclamationmark.triangle.fill"
+                android_material_icon_name="warning"
+                size={20}
+                color={colors.warning}
+              />
+              <Text style={styles.warningText}>
+                Maximum 250 files per processing job
+              </Text>
+            </View>
             <MediaUploadZone
               projectId={projectId}
               onUploadComplete={handleUploadComplete}
@@ -233,6 +244,17 @@ export default function ProcessingWorkflowScreen() {
             <Text style={styles.stepDescription}>
               Verify complete coverage and delete poor quality images
             </Text>
+            <View style={styles.infoBox}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={styles.infoText}>
+                {mediaFiles.length} files uploaded (max 250 per job)
+              </Text>
+            </View>
             <MediaGallery
               mediaFiles={mediaFiles}
               onDelete={handleDeleteMedia}
@@ -409,6 +431,38 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 24,
     lineHeight: 24,
+  },
+  warningBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: colors.warning + "20",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.warning,
+    marginBottom: 16,
+    gap: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginBottom: 16,
+    gap: 8,
+  },
+  infoText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
   },
   actionButtons: {
     flexDirection: "row",
