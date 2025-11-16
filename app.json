@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "photoforge-mobile-app-jgljjv",
@@ -17,8 +18,7 @@
       "bundleIdentifier": "com.anonymous.Natively",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
-      },
-      "googleServicesFile": "./GoogleService-Info.plist"
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -26,8 +26,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.droneelite.photoforgemobile",
-      "googleServicesFile": "./google-services.json"
+      "package": "com.droneelite.photoforgemobile"
     },
     "web": {
       "favicon": "./assets/images/final_quest_240x240.png",
@@ -36,9 +35,7 @@
     "plugins": [
       "expo-font",
       "expo-router",
-      "expo-web-browser",
-      "@react-native-firebase/app",
-      "@react-native-firebase/crashlytics"
+      "expo-web-browser"
     ],
     "scheme": "natively",
     "experiments": {
