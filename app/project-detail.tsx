@@ -9,6 +9,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -163,6 +164,42 @@ export default function ProjectDetailScreen() {
     }
   };
 
+  const handleDownloadModel = (model: any, type: string) => {
+    const downloadUrl = model.download_urls?.[type] || model.output_url;
+    
+    if (!downloadUrl) {
+      Alert.alert("Error", "Download URL not available for this model");
+      return;
+    }
+
+    Alert.alert(
+      "Download Model",
+      `Download ${type} for ${model.name || model.model_name}?\n\nThis will open in your browser.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Download",
+          onPress: async () => {
+            try {
+              const supported = await Linking.canOpenURL(downloadUrl);
+              if (supported) {
+                await Linking.openURL(downloadUrl);
+              } else {
+                Alert.alert("Error", "Cannot open download URL");
+              }
+            } catch (error) {
+              console.error("Download error:", error);
+              Alert.alert("Error", "Failed to open download link");
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getProcessingStatusColor = (status: string) => {
     switch (status) {
       case "queued":
@@ -178,6 +215,149 @@ export default function ProjectDetailScreen() {
     }
   };
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case "processing":
+        return { ios: "gearshape.fill", android: "settings" };
+      case "queued":
+        return { ios: "clock.fill", android: "schedule" };
+      case "completed":
+        return { ios: "checkmark.circle.fill", android: "check_circle" };
+      case "failed":
+        return { ios: "xmark.circle.fill", android: "error" };
+      default:
+        return { ios: "circle.fill", android: "circle" };
+    }
+  };
+
+  const renderCompletedModel = (model: any, index: number) => {
+    const modelName = model.name || model.model_name || `Model ${index + 1}`;
+    const hasDownloads = model.download_urls || model.output_url;
+
+    return (
+      <View key={model.id || index} style={styles.modelCard}>
+        <View style={styles.modelHeader}>
+          <View style={styles.modelTitleRow}>
+            <IconSymbol
+              ios_icon_name="cube.fill"
+              android_material_icon_name="view_in_ar"
+              size={24}
+              color={colors.primary}
+            />
+            <Text style={styles.modelName} numberOfLines={1}>
+              {modelName}
+            </Text>
+          </View>
+          {model.status && (
+            <View style={[styles.statusBadge, { backgroundColor: getProcessingStatusColor(model.status) + "20" }]}>
+              <Text style={[styles.statusBadgeText, { color: getProcessingStatusColor(model.status) }]}>
+                {model.status}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        {model.model_type && (
+          <Text style={styles.modelType}>Type: {model.model_type}</Text>
+        )}
+
+        {model.resolution && (
+          <Text style={styles.modelDetail}>Resolution: {model.resolution}</Text>
+        )}
+
+        {model.file_size && (
+          <Text style={styles.modelDetail}>
+            Size: {(model.file_size / (1024 * 1024)).toFixed(2)} MB
+          </Text>
+        )}
+
+        {model.created_date && (
+          <Text style={styles.modelDetail}>
+            Created: {new Date(model.created_date).toLocaleDateString()}
+          </Text>
+        )}
+
+        {hasDownloads && (
+          <View style={styles.downloadSection}>
+            <Text style={styles.downloadTitle}>Download Options:</Text>
+            <View style={styles.downloadButtons}>
+              {model.download_urls?.mesh && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "mesh")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>Mesh</Text>
+                </Pressable>
+              )}
+              {model.download_urls?.textures && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "textures")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>Textures</Text>
+                </Pressable>
+              )}
+              {model.download_urls?.point_cloud && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "point_cloud")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>Point Cloud</Text>
+                </Pressable>
+              )}
+              {model.download_urls?.orthomosaic && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "orthomosaic")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>Orthomosaic</Text>
+                </Pressable>
+              )}
+              {model.output_url && !model.download_urls && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "output")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={16}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>Download</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -189,6 +369,8 @@ export default function ProjectDetailScreen() {
       </SafeAreaView>
     );
   }
+
+  const completedModels = models.filter((m) => m.status === "completed");
 
   return (
     <SafeAreaView style={styles.container}>
@@ -233,23 +415,13 @@ export default function ProjectDetailScreen() {
         )}
 
         {/* Processing Status Bar */}
-        {processingStatus && (
+        {processingStatus && processingStatus.status && (
           <View style={styles.statusCard}>
             <View style={styles.statusHeader}>
               <View style={styles.statusTitleRow}>
                 <IconSymbol
-                  ios_icon_name={
-                    processingStatus.status === "processing" ? "gearshape.fill" :
-                    processingStatus.status === "queued" ? "clock.fill" :
-                    processingStatus.status === "completed" ? "checkmark.circle.fill" :
-                    "xmark.circle.fill"
-                  }
-                  android_material_icon_name={
-                    processingStatus.status === "processing" ? "settings" :
-                    processingStatus.status === "queued" ? "schedule" :
-                    processingStatus.status === "completed" ? "check_circle" :
-                    "error"
-                  }
+                  ios_icon_name={getStatusIcon(processingStatus.status).ios}
+                  android_material_icon_name={getStatusIcon(processingStatus.status).android}
                   size={24}
                   color={getProcessingStatusColor(processingStatus.status)}
                 />
@@ -257,7 +429,7 @@ export default function ProjectDetailScreen() {
                   {processingStatus.status.charAt(0).toUpperCase() + processingStatus.status.slice(1)}
                 </Text>
               </View>
-              <Text style={styles.statusProgress}>{processingStatus.progress}%</Text>
+              <Text style={styles.statusProgress}>{processingStatus.progress || 0}%</Text>
             </View>
             
             {/* Progress Bar */}
@@ -266,15 +438,21 @@ export default function ProjectDetailScreen() {
                 style={[
                   styles.progressBarFill, 
                   { 
-                    width: `${processingStatus.progress}%`,
+                    width: `${processingStatus.progress || 0}%`,
                     backgroundColor: getProcessingStatusColor(processingStatus.status)
                   }
                 ]} 
               />
             </View>
 
-            {processingStatus.message && (
-              <Text style={styles.statusMessage}>{processingStatus.message}</Text>
+            {processingStatus.status_message && (
+              <Text style={styles.statusMessage}>{processingStatus.status_message}</Text>
+            )}
+
+            {processingStatus.uploaded_files !== undefined && processingStatus.total_files !== undefined && (
+              <Text style={styles.statusMessage}>
+                Files: {processingStatus.uploaded_files} / {processingStatus.total_files}
+              </Text>
             )}
 
             {processingStatus.status === "processing" && (
@@ -308,6 +486,14 @@ export default function ProjectDetailScreen() {
             <Text style={styles.statLabel}>3D Models</Text>
           </View>
         </View>
+
+        {/* Completed 3D Models Section */}
+        {completedModels.length > 0 && (
+          <View style={styles.modelsSection}>
+            <Text style={styles.sectionTitle}>Completed 3D Models ({completedModels.length})</Text>
+            {completedModels.map((model, index) => renderCompletedModel(model, index))}
+          </View>
+        )}
 
         <View style={styles.actionsSection}>
           <Text style={styles.sectionTitle}>Actions</Text>
@@ -388,6 +574,12 @@ export default function ProjectDetailScreen() {
               </Text>
             </View>
           </Button>
+        </View>
+
+        {/* Copyright Notices */}
+        <View style={styles.copyrightSection}>
+          <Text style={styles.copyrightText}>© DronE1337 - All rights reserved</Text>
+          <Text style={styles.copyrightText}>© PhotoForge - All rights reserved</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -546,14 +738,96 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 4,
   },
-  actionsSection: {
-    marginBottom: 24,
+  modelsSection: {
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: "700",
     color: colors.textPrimary,
     marginBottom: 16,
+  },
+  modelCard: {
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  modelHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  modelTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  modelName: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  modelType: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  modelDetail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+  downloadSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.accentBorder,
+  },
+  downloadTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  downloadButtons: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  downloadButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  downloadButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  actionsSection: {
+    marginBottom: 24,
   },
   actionButton: {
     marginBottom: 12,
@@ -568,5 +842,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: colors.surface,
+  },
+  copyrightSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: colors.accentBorder,
+    alignItems: "center",
+    gap: 8,
+  },
+  copyrightText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
 });

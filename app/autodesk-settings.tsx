@@ -226,7 +226,15 @@ export default function AutodeskSettingsScreen() {
               [
                 {
                   text: "View Project",
-                  onPress: () => router.back(),
+                  onPress: () => {
+                    router.push({
+                      pathname: "/project-detail",
+                      params: {
+                        projectId: selectedProjectId,
+                        projectName: selectedProjectName,
+                      },
+                    });
+                  },
                 },
                 {
                   text: "OK",
@@ -359,8 +367,22 @@ export default function AutodeskSettingsScreen() {
         
         Alert.alert(
           "Processing Started! 🚀",
-          `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nProcessing status will be displayed below.`,
-          [{ text: "OK" }]
+          `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nYou will be redirected to the project page.`,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Navigate back to project detail page
+                router.push({
+                  pathname: "/project-detail",
+                  params: {
+                    projectId: selectedProjectId,
+                    projectName: selectedProjectName,
+                  },
+                });
+              },
+            },
+          ]
         );
       } else {
         Alert.alert("Error", result.error || "Failed to start processing");
@@ -812,6 +834,12 @@ export default function AutodeskSettingsScreen() {
         >
           {isProcessing ? "Starting Processing..." : "Start 3D Processing"}
         </Button>
+
+        {/* Copyright Notices */}
+        <View style={styles.copyrightSection}>
+          <Text style={styles.copyrightText}>© DronE1337 - All rights reserved</Text>
+          <Text style={styles.copyrightText}>© PhotoForge - All rights reserved</Text>
+        </View>
       </ScrollView>
 
       {/* Project Picker Modal */}
@@ -1245,6 +1273,19 @@ const styles = StyleSheet.create({
   },
   processButton: {
     marginTop: 16,
+  },
+  copyrightSection: {
+    marginTop: 32,
+    paddingTop: 24,
+    borderTopWidth: 1,
+    borderTopColor: colors.accentBorder,
+    alignItems: "center",
+    gap: 8,
+  },
+  copyrightText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    textAlign: "center",
   },
   modalContainer: {
     flex: 1,
