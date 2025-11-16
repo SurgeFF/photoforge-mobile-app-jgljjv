@@ -115,11 +115,26 @@ export interface BatchUploadResponse {
 }
 
 export interface ProcessingStatus {
+  model_id?: string;
+  model_name?: string;
+  model_type?: string;
+  project_id?: string;
   status: "queued" | "processing" | "completed" | "failed";
   progress: number;
-  message?: string;
-  ai_selection_info?: any;
+  status_message?: string;
+  uploaded_files?: number;
+  total_files?: number;
+  processing_time?: number;
+  resolution?: string;
+  file_size?: number;
   output_url?: string;
+  thumbnail_url?: string;
+  settings?: any;
+  metadata?: any;
+  created_date?: string;
+  updated_date?: string;
+  poll_interval?: number;
+  ai_selection_info?: any;
   error?: string;
 }
 
@@ -1280,9 +1295,14 @@ export async function startProcessingMobile(accessKey: string, params: {
 /**
  * Check processing status and progress
  * Poll this every 5 seconds to get updates
+ * FIXED: Now correctly maps the webapp response structure
  */
 export async function checkProcessingStatusMobile(accessKey: string, modelId: string): Promise<ApiResponse<ProcessingStatus>> {
   try {
+    console.log("\n========== CHECKING PROCESSING STATUS (MOBILE) ==========");
+    console.log("🔍 Checking status for model:", modelId);
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/checkProcessingStatusMobile`);
+    
     const response = await fetch(`${FUNCTIONS_BASE}/checkProcessingStatusMobile`, {
       method: "POST",
       headers: {
@@ -1294,25 +1314,54 @@ export async function checkProcessingStatusMobile(accessKey: string, modelId: st
       }),
     });
 
-    const data = await response.json();
+    console.log("📊 Status:", response.status, response.statusText);
     
-    if (response.ok && data.success) {
+    const result = await response.json();
+    console.log("📄 Raw response:", JSON.stringify(result).substring(0, 300) + "...");
+    
+    if (response.ok && result.success && result.data) {
+      // The webapp returns the data in result.data
+      const data = result.data;
+      
+      console.log("✅ Processing status retrieved:");
+      console.log("   - Status:", data.status);
+      console.log("   - Progress:", data.progress + "%");
+      console.log("   - Message:", data.status_message || "N/A");
+      console.log("   - Files:", data.uploaded_files + "/" + data.total_files);
+      console.log("========== STATUS CHECK SUCCESS ==========\n");
+      
       return { 
         success: true, 
         data: {
+          model_id: data.model_id,
+          model_name: data.model_name,
+          model_type: data.model_type,
+          project_id: data.project_id,
           status: data.status,
           progress: data.progress || 0,
-          message: data.message,
-          ai_selection_info: data.ai_selection_info,
+          status_message: data.status_message,
+          uploaded_files: data.uploaded_files,
+          total_files: data.total_files,
+          processing_time: data.processing_time,
+          resolution: data.resolution,
+          file_size: data.file_size,
           output_url: data.output_url,
-          error: data.error,
+          thumbnail_url: data.thumbnail_url,
+          settings: data.settings,
+          metadata: data.metadata,
+          created_date: data.created_date,
+          updated_date: data.updated_date,
+          poll_interval: data.poll_interval || 5000,
         }
       };
     } else {
-      return { success: false, error: data.error || "Failed to check status" };
+      const errorMsg = result.error || "Failed to check status";
+      console.log("❌ Status check failed:", errorMsg);
+      console.log("========== STATUS CHECK FAILED ==========\n");
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
-    console.error("❌ Check processing status error:", error);
+    console.error("❌ EXCEPTION during checkProcessingStatusMobile:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
