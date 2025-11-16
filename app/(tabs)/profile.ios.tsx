@@ -79,11 +79,26 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <TopographicBackground />
+      
+      {/* Header with Back Button */}
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow_back"
+            size={24}
+            color={colors.textPrimary}
+          />
+        </Pressable>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <View style={styles.placeholder} />
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
+        <View style={styles.profileHeader}>
           <View style={styles.avatarContainer}>
             <IconSymbol
               ios_icon_name="person.circle.fill"
@@ -92,7 +107,6 @@ export default function ProfileScreen() {
               color={colors.primary}
             />
           </View>
-          <Text style={styles.title}>Profile</Text>
         </View>
 
         <View style={styles.section}>
@@ -200,6 +214,29 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.backgroundLight,
   },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+    backgroundColor: colors.surface + "99",
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    flex: 1,
+    textAlign: "center",
+  },
+  placeholder: {
+    width: 40,
+  },
   scrollView: {
     flex: 1,
   },
@@ -207,17 +244,12 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 120,
   },
-  header: {
+  profileHeader: {
     alignItems: "center",
     marginBottom: 32,
   },
   avatarContainer: {
     marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.textPrimary,
   },
   section: {
     marginBottom: 32,
@@ -229,7 +261,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   card: {
-    backgroundColor: colors.surface + 'CC',
+    backgroundColor: colors.surface + '99',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -257,7 +289,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: colors.surface + 'CC',
+    backgroundColor: colors.surface + '99',
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,

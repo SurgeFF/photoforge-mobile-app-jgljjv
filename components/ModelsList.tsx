@@ -17,11 +17,12 @@ interface ProcessedModel {
   id: string;
   name: string;
   thumbnail_url?: string;
-  format: string;
+  format?: string;
   file_size?: number;
   poly_count?: number;
   resolution?: string;
   created_at: string;
+  coordinate_system?: string;
   download_urls?: {
     mesh?: string;
     textures?: string;
@@ -83,9 +84,11 @@ export default function ModelsList({
             />
           </View>
         )}
-        <View style={styles.formatBadge}>
-          <Text style={styles.formatText}>{item.format.toUpperCase()}</Text>
-        </View>
+        {item.format && (
+          <View style={styles.formatBadge}>
+            <Text style={styles.formatText}>{item.format.toUpperCase()}</Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.modelInfo}>
@@ -124,6 +127,20 @@ export default function ModelsList({
             </View>
           )}
         </View>
+
+        {item.coordinate_system && (
+          <View style={styles.coordinateRow}>
+            <IconSymbol
+              ios_icon_name="globe"
+              android_material_icon_name="public"
+              size={14}
+              color={colors.textSecondary}
+            />
+            <Text style={styles.coordinateText}>
+              {item.coordinate_system && item.coordinate_system.toUpperCase ? item.coordinate_system.toUpperCase() : item.coordinate_system}
+            </Text>
+          </View>
+        )}
 
         {item.download_urls && (
           <View style={styles.downloadButtons}>
@@ -167,6 +184,20 @@ export default function ModelsList({
                   color={colors.primary}
                 />
                 <Text style={styles.downloadText}>Point Cloud</Text>
+              </Pressable>
+            )}
+            {item.download_urls.orthomosaic && (
+              <Pressable
+                style={styles.downloadButton}
+                onPress={() => onDownload?.(item, "orthomosaic")}
+              >
+                <IconSymbol
+                  ios_icon_name="arrow.down.circle"
+                  android_material_icon_name="download"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={styles.downloadText}>Orthomosaic</Text>
               </Pressable>
             )}
           </View>
@@ -220,7 +251,7 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   modelCard: {
-    backgroundColor: colors.surface + "CC",
+    backgroundColor: colors.surface + "99",
     borderRadius: 16,
     overflow: "hidden",
     borderWidth: 1,
@@ -268,7 +299,7 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     gap: 16,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   stat: {
     flexDirection: "row",
@@ -276,6 +307,16 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   statText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  coordinateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 12,
+  },
+  coordinateText: {
     fontSize: 12,
     color: colors.textSecondary,
   },

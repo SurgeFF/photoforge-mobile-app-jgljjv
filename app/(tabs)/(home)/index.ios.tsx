@@ -17,10 +17,19 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
-import { validateAccessKey, getProjects } from "@/utils/apiClient";
+import { validateAccessKey, getProjects, checkProcessingStatusMobile, getProcessedModels } from "@/utils/apiClient";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
+
+interface ProcessingProject {
+  id: string;
+  name: string;
+  modelId: string;
+  status: "queued" | "processing" | "completed" | "failed";
+  progress: number;
+  message?: string;
+}
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -31,6 +40,8 @@ export default function HomeScreen() {
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
   const [projectCount, setProjectCount] = useState(0);
+  const [processingProjects, setProcessingProjects] = useState<ProcessingProject[]>([]);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     checkStoredAccessKey();
@@ -40,13 +51,86 @@ export default function HomeScreen() {
     if (isAuthenticated && accessKey) {
       loadProjects();
     }
+    
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
   }, [isAuthenticated, accessKey]);
+
+  useEffect(() => {
+    if (processingProjects.length > 0 && !pollingInterval) {
+      const interval = setInterval(() => {
+        checkProcessingStatuses();
+      }, 5000);
+      setPollingInterval(interval);
+    } else if (processingProjects.length === 0 && pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+  }, [processingProjects]);
+
+  const checkProcessingStatuses = async () => {
+    if (!accessKey) return;
+
+    const updatedProjects = await Promise.all(
+      processingProjects.map(async (project) => {
+        try {
+          const result = await checkProcessingStatusMobile(accessKey, project.modelId);
+          if (result.success && result.data) {
+            return {
+              ...project,
+              status: result.data.status,
+              progress: result.data.progress,
+              message: result.data.message,
+            };
+          }
+        } catch (error) {
+          console.error("Error checking processing status:", error);
+        }
+        return project;
+      })
+    );
+
+    setProcessingProjects(updatedProjects.filter(p => p.status === "processing" || p.status === "queued"));
+  };
 
   const loadProjects = async () => {
     try {
       const result = await getProjects(accessKey);
       if (result.success && result.data) {
         setProjectCount(result.data.length);
+        
+        // Check for processing models
+        const processing: ProcessingProject[] = [];
+        for (const project of result.data) {
+          try {
+            const modelsResult = await getProcessedModels(accessKey, project.id);
+            if (modelsResult.success && modelsResult.data) {
+              const processingModel = modelsResult.data.find(
+                (model: any) => model.status === "processing" || model.status === "queued"
+              );
+              
+              if (processingModel) {
+                const statusResult = await checkProcessingStatusMobile(accessKey, processingModel.id);
+                if (statusResult.success && statusResult.data) {
+                  processing.push({
+                    id: project.id,
+                    name: project.name,
+                    modelId: processingModel.id,
+                    status: statusResult.data.status,
+                    progress: statusResult.data.progress,
+                    message: statusResult.data.message,
+                  });
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error checking project models:", error);
+          }
+        }
+        setProcessingProjects(processing);
       }
     } catch (error) {
       console.error("[HomeScreen] Error loading projects:", error);
@@ -138,10 +222,14 @@ export default function HomeScreen() {
             console.log("[HomeScreen] Logging out...");
             await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
             await AsyncStorage.removeItem("@photoforge_user_name");
+            if (pollingInterval) {
+              clearInterval(pollingInterval);
+            }
             setIsAuthenticated(false);
             setAccessKey("");
             setUserName("");
             setProjectCount(0);
+            setProcessingProjects([]);
             console.log("[HomeScreen] Logged out successfully");
           },
         },
@@ -163,6 +251,21 @@ export default function HomeScreen() {
     } catch (error) {
       console.error("[HomeScreen] ❌ Navigation error:", error);
       Alert.alert("Error", "Failed to open Flight Planning. Please try again.");
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "queued":
+        return colors.textSecondary;
+      case "processing":
+        return colors.warning;
+      case "completed":
+        return colors.success;
+      case "failed":
+        return colors.error;
+      default:
+        return colors.textSecondary;
     }
   };
 
@@ -272,33 +375,9 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container} edges={['top']}>
       <TopographicBackground />
       
-      {/* Top Bar with Title and Navigation Buttons */}
+      {/* Top Bar with Title Only */}
       <View style={styles.topBar}>
         <Text style={styles.topBarTitle}>PhotoForge</Text>
-        <View style={styles.topBarButtons}>
-          <Pressable
-            style={styles.topBarButton}
-            onPress={() => router.push("/(tabs)/(home)/")}
-          >
-            <IconSymbol
-              ios_icon_name="house.fill"
-              android_material_icon_name="home"
-              size={24}
-              color={colors.textPrimary}
-            />
-          </Pressable>
-          <Pressable
-            style={styles.topBarButton}
-            onPress={() => router.push("/(tabs)/profile")}
-          >
-            <IconSymbol
-              ios_icon_name="person.fill"
-              android_material_icon_name="person"
-              size={24}
-              color={colors.textPrimary}
-            />
-          </Pressable>
-        </View>
       </View>
 
       <ScrollView
@@ -339,6 +418,49 @@ export default function HomeScreen() {
             <Text style={styles.statLabel}>Models</Text>
           </View>
         </View>
+
+        {/* Processing Status Section */}
+        {processingProjects.length > 0 && (
+          <View style={styles.processingSection}>
+            <Text style={styles.sectionTitle}>Processing</Text>
+            {processingProjects.map((project, index) => (
+              <View key={index} style={styles.processingCard}>
+                <View style={styles.processingHeader}>
+                  <View style={styles.processingTitleRow}>
+                    <IconSymbol
+                      ios_icon_name={project.status === "processing" ? "gearshape.fill" : "clock.fill"}
+                      android_material_icon_name={project.status === "processing" ? "settings" : "schedule"}
+                      size={20}
+                      color={getStatusColor(project.status)}
+                    />
+                    <Text style={styles.processingProjectName} numberOfLines={1}>
+                      {project.name}
+                    </Text>
+                  </View>
+                  <Text style={styles.processingProgress}>{project.progress}%</Text>
+                </View>
+                
+                <View style={styles.progressBarContainer}>
+                  <View 
+                    style={[
+                      styles.progressBarFill, 
+                      { 
+                        width: `${project.progress}%`,
+                        backgroundColor: getStatusColor(project.status)
+                      }
+                    ]} 
+                  />
+                </View>
+
+                {project.message && (
+                  <Text style={styles.processingMessage} numberOfLines={1}>
+                    {project.message}
+                  </Text>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.sectionTitle}>Quick Actions</Text>
 
@@ -539,7 +661,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     fontSize: 16,
     borderWidth: 1,
-    backgroundColor: colors.surface + 'CC',
+    backgroundColor: colors.surface + '99',
     color: colors.textPrimary,
   },
   errorContainer: {
@@ -562,7 +684,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 24,
     padding: 16,
-    backgroundColor: colors.surface + 'CC',
+    backgroundColor: colors.surface + '99',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.accentBorder,
@@ -594,10 +716,10 @@ const styles = StyleSheet.create({
   topBar: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "center",
     paddingHorizontal: 20,
     paddingVertical: 12,
-    backgroundColor: colors.surface + "CC",
+    backgroundColor: colors.surface + "99",
     borderBottomWidth: 1,
     borderBottomColor: colors.accentBorder,
   },
@@ -605,20 +727,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "800",
     color: colors.textPrimary,
-  },
-  topBarButtons: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  topBarButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.backgroundLight,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
   },
   statsContainer: {
     flexDirection: "row",
@@ -628,7 +736,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: colors.surface + 'CC',
+    backgroundColor: colors.surface + '99',
     borderRadius: 16,
     padding: 16,
     alignItems: "center",
@@ -645,6 +753,56 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  processingSection: {
+    marginBottom: 24,
+  },
+  processingCard: {
+    backgroundColor: colors.surface + "99",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  processingHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  processingTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  processingProjectName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    flex: 1,
+  },
+  processingProgress: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: colors.accentBorder,
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  progressBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  processingMessage: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: "italic",
   },
   sectionTitle: {
     fontSize: 20,
