@@ -10,6 +10,7 @@ import {
   Alert,
   Platform,
   Pressable,
+  Linking,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -21,6 +22,7 @@ import Button from "@/components/button";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { validateAccessKey, getProjectsMobile, checkProcessingStatusMobile, getProcessedModels } from "@/utils/apiClient";
 import { startNotificationPolling, stopNotificationPolling, onNotification } from "@/utils/notificationService";
+import { initializeAnalytics, trackScreenView, trackLogin, trackLogout, trackEvent } from "@/utils/analytics";
 
 interface FeatureCardProps {
   icon: string;
@@ -41,6 +43,7 @@ interface ProcessingProject {
 }
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
+const PRIVACY_POLICY_URL = "https://drone1337.com/photoforgemobileprivacy";
 
 export default function HomeScreen() {
   const theme = useTheme();
@@ -53,6 +56,11 @@ export default function HomeScreen() {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // Initialize analytics on app start
+    initializeAnalytics().then(() => {
+      trackScreenView('Home');
+    });
+    
     checkStoredAccessKey();
   }, []);
 
@@ -173,6 +181,9 @@ export default function HomeScreen() {
           setAccessKey(storedKey);
           setIsAuthenticated(true);
           console.log("✅ Auto-login successful");
+          
+          // Track auto-login
+          trackLogin('auto_login', storedKey);
         } else {
           console.log("❌ Stored key invalid, clearing...");
           await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
@@ -200,12 +211,17 @@ export default function HomeScreen() {
         await AsyncStorage.setItem(ACCESS_KEY_STORAGE, accessKey);
         setIsAuthenticated(true);
         Alert.alert("Success", "Logged in successfully!");
+        
+        // Track login
+        trackLogin('manual_login', accessKey);
       } else {
         Alert.alert("Error", result.error || "Invalid access key");
+        trackEvent('login_failed', { reason: result.error || 'invalid_key' });
       }
     } catch (error) {
       console.error("Login error:", error);
       Alert.alert("Error", "Failed to login. Please try again.");
+      trackEvent('login_error', { error: String(error) });
     } finally {
       setIsLoading(false);
     }
@@ -230,6 +246,9 @@ export default function HomeScreen() {
             setIsAuthenticated(false);
             setProjectCount(0);
             setProcessingProjects([]);
+            
+            // Track logout
+            trackLogout();
           },
         },
       ]
@@ -251,6 +270,21 @@ export default function HomeScreen() {
       );
     } else {
       router.push("/projects");
+    }
+  };
+
+  const handlePrivacyPolicy = async () => {
+    try {
+      const supported = await Linking.canOpenURL(PRIVACY_POLICY_URL);
+      if (supported) {
+        await Linking.openURL(PRIVACY_POLICY_URL);
+        trackEvent('privacy_policy_opened');
+      } else {
+        Alert.alert("Error", "Cannot open privacy policy URL");
+      }
+    } catch (error) {
+      console.error("Error opening privacy policy:", error);
+      Alert.alert("Error", "Failed to open privacy policy");
     }
   };
 
@@ -341,6 +375,11 @@ export default function HomeScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Privacy Policy Link */}
+          <Pressable onPress={handlePrivacyPolicy} style={styles.privacyPolicyContainer}>
+            <Text style={styles.privacyPolicyText}>Privacy Policy</Text>
+          </Pressable>
         </ScrollView>
       </SafeAreaView>
     );
@@ -499,6 +538,11 @@ export default function HomeScreen() {
         >
           Logout
         </Button>
+
+        {/* Privacy Policy Link */}
+        <Pressable onPress={handlePrivacyPolicy} style={styles.privacyPolicyContainer}>
+          <Text style={styles.privacyPolicyText}>Privacy Policy</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -766,5 +810,15 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     marginTop: 8,
+  },
+  privacyPolicyContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+    marginTop: 16,
+  },
+  privacyPolicyText: {
+    fontSize: 14,
+    color: colors.primary,
+    textDecorationLine: "underline",
   },
 });
