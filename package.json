@@ -1,3 +1,4 @@
+
 {
   "name": "photoforge-mobile-app-jgljjv",
   "version": "1.0.0",
@@ -83,7 +84,11 @@
     "webpack-cli": "^6.0.1"
   },
   "resolutions": {
-    "@expo/prebuild-config": "latest"
+    "@expo/prebuild-config": "latest",
+    "@react-native-async-storage/async-storage": "2.2.0"
+  },
+  "overrides": {
+    "@react-native-async-storage/async-storage": "2.2.0"
   },
   "private": true
 }
