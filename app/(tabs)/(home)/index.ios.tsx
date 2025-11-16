@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from "react-native";
 import { useTheme } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -17,6 +18,7 @@ import { IconSymbol } from "@/components/IconSymbol";
 import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
 import { validateAccessKey, getProjects } from "@/utils/apiClient";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
@@ -267,19 +269,43 @@ export default function HomeScreen() {
 
   // Main authenticated view - Dashboard
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TopographicBackground />
+      
+      {/* Top Bar with Title and Navigation Buttons */}
+      <View style={styles.topBar}>
+        <Text style={styles.topBarTitle}>PhotoForge</Text>
+        <View style={styles.topBarButtons}>
+          <Pressable
+            style={styles.topBarButton}
+            onPress={() => router.push("/(tabs)/(home)/")}
+          >
+            <IconSymbol
+              ios_icon_name="house.fill"
+              android_material_icon_name="home"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </Pressable>
+          <Pressable
+            style={styles.topBarButton}
+            onPress={() => router.push("/(tabs)/profile")}
+          >
+            <IconSymbol
+              ios_icon_name="person.fill"
+              android_material_icon_name="person"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </Pressable>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.mainContent}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <Text style={styles.welcomeTitle}>PhotoForge</Text>
-          <Text style={styles.welcomeSubtitle}>
-            {userName ? `Welcome back, ${userName}` : "Drone Mapping Dashboard"}
-          </Text>
-        </View>
-
         {/* Quick Stats */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
@@ -314,15 +340,15 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Main Features */}
-        <View style={styles.featuresContainer}>
-          <Text style={styles.sectionTitle}>Project Management</Text>
-          
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+        {/* Two-column grid */}
+        <View style={styles.featuresGrid}>
           <FeatureCard
             icon="folder.badge.plus"
             androidIcon="create_new_folder"
-            title="Create Project"
-            description="Start a new mapping project"
+            title="New Project"
+            description="Create a new mapping project"
             onPress={() => router.push("/new-project")}
             color={colors.primary}
           />
@@ -335,8 +361,6 @@ export default function HomeScreen() {
             onPress={() => router.push("/projects")}
             color={colors.primaryDark}
           />
-
-          <Text style={styles.sectionTitle}>Drone Operations</Text>
 
           <FeatureCard
             icon="airplane"
@@ -356,8 +380,6 @@ export default function HomeScreen() {
             color={colors.primaryDark}
           />
 
-          <Text style={styles.sectionTitle}>Processing & Analysis</Text>
-
           <FeatureCard
             icon="cube.transparent"
             androidIcon="view_in_ar"
@@ -375,8 +397,6 @@ export default function HomeScreen() {
             onPress={() => router.push("/gallery")}
             color={colors.primaryDark}
           />
-
-          <Text style={styles.sectionTitle}>Account & Settings</Text>
 
           <FeatureCard
             icon="creditcard.fill"
@@ -414,7 +434,7 @@ export default function HomeScreen() {
           Logout
         </Button>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -429,7 +449,13 @@ interface FeatureCardProps {
 
 function FeatureCard({ icon, androidIcon, title, description, onPress, color }: FeatureCardProps) {
   return (
-    <Button onPress={onPress} style={[styles.featureCard, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.featureCard,
+        pressed && styles.featureCardPressed,
+      ]}
+    >
       <View style={styles.featureContent}>
         <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
           <IconSymbol
@@ -439,20 +465,10 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
             color={color}
           />
         </View>
-        <View style={styles.featureTextContainer}>
-          <Text style={styles.featureTitle}>{title}</Text>
-          <Text style={styles.featureDescription}>
-            {description}
-          </Text>
-        </View>
-        <IconSymbol
-          ios_icon_name="chevron.right"
-          android_material_icon_name="chevron_right"
-          size={24}
-          color={colors.textSecondary}
-        />
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDescription}>{description}</Text>
       </View>
-    </Button>
+    </Pressable>
   );
 }
 
@@ -471,9 +487,9 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   mainContent: {
-    paddingTop: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 140,
   },
   loginContainer: {
     width: "100%",
@@ -575,26 +591,39 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.warning,
   },
-  header: {
+  topBar: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: colors.surface + "CC",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
   },
-  welcomeTitle: {
-    fontSize: 32,
+  topBarTitle: {
+    fontSize: 24,
     fontWeight: "800",
     color: colors.textPrimary,
-    textAlign: "center",
   },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: "center",
+  topBarButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  topBarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.backgroundLight,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 32,
+    marginBottom: 24,
     gap: 12,
   },
   statCard: {
@@ -621,48 +650,53 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  featuresContainer: {
+  featuresGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 12,
+    marginBottom: 24,
   },
   featureCard: {
+    width: "48%",
     backgroundColor: colors.surface + 'CC',
     borderRadius: 16,
-    padding: 0,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    marginBottom: 0,
+    padding: 16,
+    minHeight: 160,
+  },
+  featureCardPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   featureContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 16,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
   },
-  featureTextContainer: {
-    flex: 1,
+  iconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
   },
   featureTitle: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "700",
     marginBottom: 4,
     color: colors.textPrimary,
+    textAlign: "center",
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: 11,
     color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 14,
   },
   logoutButton: {
-    marginTop: 32,
+    marginTop: 8,
     height: 48,
   },
 });

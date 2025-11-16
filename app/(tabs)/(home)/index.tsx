@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Pressable,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -245,27 +246,42 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <TopographicBackground />
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <View>
-            <Text style={styles.greeting}>Welcome to</Text>
-            <Text style={styles.appName}>PhotoForge</Text>
-          </View>
-          <Button
-            onPress={handleLogout}
-            variant="outline"
-            style={styles.logoutButton}
+      
+      {/* Top Bar with Title and Navigation Buttons */}
+      <View style={styles.topBar}>
+        <Text style={styles.topBarTitle}>PhotoForge</Text>
+        <View style={styles.topBarButtons}>
+          <Pressable
+            style={styles.topBarButton}
+            onPress={() => router.push("/(tabs)/(home)/")}
           >
-            Logout
-          </Button>
+            <IconSymbol
+              ios_icon_name="house.fill"
+              android_material_icon_name="home"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </Pressable>
+          <Pressable
+            style={styles.topBarButton}
+            onPress={() => router.push("/(tabs)/profile")}
+          >
+            <IconSymbol
+              ios_icon_name="person.fill"
+              android_material_icon_name="person"
+              size={24}
+              color={colors.textPrimary}
+            />
+          </Pressable>
         </View>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.statsCard}>
           <View style={styles.statItem}>
@@ -355,6 +371,14 @@ export default function HomeScreen() {
             color={colors.textSecondary}
           />
         </View>
+
+        <Button
+          onPress={handleLogout}
+          variant="outline"
+          style={styles.logoutButton}
+        >
+          Logout
+        </Button>
       </ScrollView>
     </SafeAreaView>
   );
@@ -362,10 +386,12 @@ export default function HomeScreen() {
 
 function FeatureCard({ icon, androidIcon, title, description, onPress, color }: FeatureCardProps) {
   return (
-    <Button
+    <Pressable
       onPress={onPress}
-      variant="outline"
-      style={styles.featureCard}
+      style={({ pressed }) => [
+        styles.featureCard,
+        pressed && styles.featureCardPressed,
+      ]}
     >
       <View style={styles.featureContent}>
         <View style={[styles.featureIconContainer, { backgroundColor: color + "20" }]}>
@@ -379,7 +405,7 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
         <Text style={styles.featureTitle}>{title}</Text>
         <Text style={styles.featureDescription}>{description}</Text>
       </View>
-    </Button>
+    </Pressable>
   );
 }
 
@@ -473,38 +499,42 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 18,
   },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "android" ? 48 : 16,
-    paddingBottom: 16,
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === "android" ? 48 : 12,
+    backgroundColor: colors.surface + "CC",
     borderBottomWidth: 1,
     borderBottomColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
   },
-  headerContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  greeting: {
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
-  appName: {
-    fontSize: 28,
+  topBarTitle: {
+    fontSize: 24,
     fontWeight: "800",
     color: colors.textPrimary,
   },
-  logoutButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  topBarButtons: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  topBarButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.backgroundLight,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
   },
   scrollView: {
     flex: 1,
   },
   content: {
-    padding: 24,
-    paddingBottom: 120,
+    padding: 20,
+    paddingBottom: 140,
   },
   statsCard: {
     backgroundColor: colors.surface + "CC",
@@ -539,16 +569,22 @@ const styles = StyleSheet.create({
   featuresGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 12,
+    marginBottom: 24,
   },
   featureCard: {
     width: "48%",
-    aspectRatio: 1,
-    padding: 0,
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 16,
+    padding: 16,
+    minHeight: 160,
+  },
+  featureCardPressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   featureContent: {
     flex: 1,
-    padding: 16,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -561,16 +597,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   featureTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: colors.textPrimary,
     textAlign: "center",
     marginBottom: 4,
   },
   featureDescription: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     textAlign: "center",
-    lineHeight: 16,
+    lineHeight: 14,
+  },
+  logoutButton: {
+    marginTop: 8,
   },
 });
