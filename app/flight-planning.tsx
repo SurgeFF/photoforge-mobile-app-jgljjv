@@ -11,6 +11,8 @@ import {
   Pressable,
   ActivityIndicator,
   Switch,
+  Slider,
+  Modal,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -51,6 +53,7 @@ export default function FlightPlanningScreen() {
   const projectId = params.projectId as string;
   const projectName = params.projectName as string;
   const webViewRef = useRef<WebView>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   // Mission Configuration
   const [missionName, setMissionName] = useState("DA3S Mapping");
@@ -63,20 +66,14 @@ export default function FlightPlanningScreen() {
 
   // Terrain Following
   const [enableTerrainFollowing, setEnableTerrainFollowing] = useState(false);
-  const [minClearance, setMinClearance] = useState("50");
-  const [obstacleSafetyMargin, setObstacleSafetyMargin] = useState("30");
 
-  // Grid Pattern Generator
-  const [gridSpacing, setGridSpacing] = useState("medium");
+  // Grid Pattern Generator - Segmentation (0-100)
+  const [segmentation, setSegmentation] = useState(50);
   const [photoOverlap, setPhotoOverlap] = useState("75");
-  const [flightLineSpacing, setFlightLineSpacing] = useState("auto");
 
   // Camera specs (DJI Phantom 4 Pro defaults)
   const [sensorWidth, setSensorWidth] = useState("13.2");
-  const [sensorHeight, setSensorHeight] = useState("8.8");
-  const [focalLength, setFocalLength] = useState("8.8");
   const [imageWidth, setImageWidth] = useState("5472");
-  const [imageHeight, setImageHeight] = useState("3648");
   const [cameraFOV, setCameraFOV] = useState("84");
 
   // Address search
@@ -93,61 +90,48 @@ export default function FlightPlanningScreen() {
   const [drawnArea, setDrawnArea] = useState<Array<{ lat: number; lng: number }> | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [mapReady, setMapReady] = useState(false);
+  const [isMapTouched, setIsMapTouched] = useState(false);
+
+  // File type selection modal
+  const [showFileTypeModal, setShowFileTypeModal] = useState(false);
+  const [selectedFileType, setSelectedFileType] = useState<"json" | "kml" | "csv">("json");
 
   // Drone presets
   const dronePresets: Record<string, any> = {
     phantom4pro: {
       name: "DJI Phantom 4 Pro",
       sensor_width: 13.2,
-      sensor_height: 8.8,
-      focal_length: 8.8,
       image_width: 5472,
-      image_height: 3648,
       camera_fov: 84,
     },
     mavic2pro: {
       name: "DJI Mavic 2 Pro",
       sensor_width: 13.2,
-      sensor_height: 8.8,
-      focal_length: 10.26,
       image_width: 5472,
-      image_height: 3648,
       camera_fov: 77,
     },
     mavic3: {
       name: "DJI Mavic 3",
       sensor_width: 17.3,
-      sensor_height: 13.0,
-      focal_length: 24,
       image_width: 5280,
-      image_height: 3956,
       camera_fov: 84,
     },
     matrice30: {
       name: "DJI Matrice 30",
       sensor_width: 17.3,
-      sensor_height: 13.0,
-      focal_length: 24,
       image_width: 8000,
-      image_height: 6000,
       camera_fov: 84,
     },
     air2s: {
       name: "DJI Air 2S",
       sensor_width: 13.2,
-      sensor_height: 8.8,
-      focal_length: 8.8,
       image_width: 5472,
-      image_height: 3648,
       camera_fov: 88,
     },
     mini3pro: {
       name: "DJI Mini 3 Pro",
       sensor_width: 9.7,
-      sensor_height: 7.3,
-      focal_length: 6.72,
       image_width: 4032,
-      image_height: 3024,
       camera_fov: 82.1,
     },
   };
@@ -157,10 +141,7 @@ export default function FlightPlanningScreen() {
     const preset = dronePresets[droneKey];
     if (preset) {
       setSensorWidth(preset.sensor_width.toString());
-      setSensorHeight(preset.sensor_height.toString());
-      setFocalLength(preset.focal_length.toString());
       setImageWidth(preset.image_width.toString());
-      setImageHeight(preset.image_height.toString());
       setCameraFOV(preset.camera_fov.toString());
     }
   };
@@ -173,7 +154,6 @@ export default function FlightPlanningScreen() {
 
     setIsSearching(true);
     try {
-      // Use Google Geocoding API to convert address to coordinates
       const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(searchAddress)}&key=${GOOGLE_MAPS_API_KEY}`;
       const response = await fetch(geocodeUrl);
       const data = await response.json();
@@ -182,7 +162,6 @@ export default function FlightPlanningScreen() {
         const location = data.results[0].geometry.location;
         console.log("📍 Address found:", location);
 
-        // Send coordinates to map to pan to location
         if (webViewRef.current) {
           webViewRef.current.injectJavaScript(`
             if (typeof panToLocation === 'function') {
@@ -244,14 +223,12 @@ export default function FlightPlanningScreen() {
     try {
       console.log("🛫 Generating flight plan with new mobile endpoint...");
 
-      // Validate project ID
       if (!projectId) {
         Alert.alert("Error", "No project selected. Please select a project first.");
         router.back();
         return;
       }
 
-      // Prepare area coordinates
       const areaCoordinates = drawnArea || [
         { lat: 37.7749, lng: -122.4194 },
         { lat: 37.7750, lng: -122.4194 },
@@ -266,6 +243,8 @@ export default function FlightPlanningScreen() {
       console.log("   - Overlap:", photoOverlap, "%");
       console.log("   - Speed:", globalSpeed, "m/s");
       console.log("   - Gimbal pitch:", gimbalPitch, "°");
+      console.log("   - Terrain following:", enableTerrainFollowing);
+      console.log("   - Segmentation:", segmentation);
 
       // Prepare settings object matching backend API
       const settings = {
@@ -276,11 +255,12 @@ export default function FlightPlanningScreen() {
         camera_fov: parseFloat(cameraFOV),
         image_width: parseInt(imageWidth),
         sensor_width: parseFloat(sensorWidth),
+        terrain_following: enableTerrainFollowing,
+        segmentation: segmentation,
       };
 
       console.log("⚙️ Settings:", settings);
 
-      // Call the new mobile endpoint
       const result = await generateFlightPlanMobile(
         projectId,
         areaCoordinates,
@@ -298,7 +278,6 @@ export default function FlightPlanningScreen() {
             statistics: planData.statistics,
           });
           
-          // Send waypoints to map for visualization
           if (webViewRef.current && planData.waypoints) {
             const waypointsJS = JSON.stringify(planData.waypoints);
             webViewRef.current.injectJavaScript(`
@@ -322,6 +301,10 @@ export default function FlightPlanningScreen() {
             `• ${stats.area_coverage_sq_km} km² coverage\n` +
             `• ${stats.gsd_cm_per_pixel} cm/px GSD`,
             [
+              {
+                text: "Download",
+                onPress: () => setShowFileTypeModal(true),
+              },
               {
                 text: "Upload to Drone",
                 onPress: () => handleUploadToDrone(),
@@ -385,25 +368,20 @@ export default function FlightPlanningScreen() {
     }
   };
 
-  const handleExport = (format: "json" | "kml" | "csv") => {
+  const handleDownload = (fileType: "json" | "kml" | "csv") => {
     if (!flightPlanData) {
-      Alert.alert("Error", "No flight plan to export");
+      Alert.alert("Error", "No flight plan to download");
       return;
     }
 
-    let exportData = "";
-    
-    if (format === "json") {
-      exportData = JSON.stringify(flightPlanData, null, 2);
-    } else if (format === "kml") {
-      exportData = "KML export coming soon...";
-    } else if (format === "csv") {
-      exportData = "CSV export coming soon...";
-    }
+    setSelectedFileType(fileType);
+    setShowFileTypeModal(false);
 
+    console.log(`📥 Downloading flight plan as ${fileType.toUpperCase()}`);
+    
     Alert.alert(
-      `Export ${format.toUpperCase()}`,
-      `Export functionality will be available in a future update.\n\nFor now, here's a preview:\n${exportData.substring(0, 200)}...`,
+      `Download ${fileType.toUpperCase()}`,
+      `Flight plan will be downloaded as ${fileType.toUpperCase()} format.\n\nThis feature will be fully implemented in a future update with actual file download functionality.`,
       [{ text: "OK" }]
     );
   };
@@ -413,9 +391,7 @@ export default function FlightPlanningScreen() {
       const data = JSON.parse(event.nativeEvent.data);
       
       if (data.type === "area_drawn") {
-        // Extract coordinates from the polygon
         const coordinates = data.area.coordinates[0];
-        // Convert to array of {lat, lng} objects, excluding the closing point
         const areaCoords = coordinates.slice(0, -1).map((coord: [number, number]) => ({
           lat: coord[1],
           lng: coord[0],
@@ -433,7 +409,6 @@ export default function FlightPlanningScreen() {
     }
   };
 
-  // Generate Google Maps HTML
   const getMapHTML = () => {
     return `
       <!DOCTYPE html>
@@ -604,30 +579,11 @@ export default function FlightPlanningScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        scrollEnabled={true}
-        nestedScrollEnabled={true}
-      >
-        <View style={styles.projectInfo}>
-          <IconSymbol
-            ios_icon_name="airplane"
-            android_material_icon_name="flight"
-            size={48}
-            color={colors.primary}
-          />
-          <Text style={styles.projectName}>{projectName || "Flight Plan"}</Text>
-          <Text style={styles.subtitle}>
-            Automated drone flight path generation for mapping missions
-          </Text>
-        </View>
-
-        {/* Interactive Map */}
-        <View style={styles.mapContainer}>
+      <View style={styles.contentContainer}>
+        {/* Map Section - Fixed at top, no scrolling */}
+        <View style={styles.mapSection}>
           <Text style={styles.sectionTitle}>Define Flight Area</Text>
           
-          {/* Address Search */}
           <View style={styles.addressSearchContainer}>
             <TextInput
               style={styles.addressInput}
@@ -667,512 +623,407 @@ export default function FlightPlanningScreen() {
               <Text style={styles.webNotSupportedText}>
                 Interactive map is not available on web preview.
               </Text>
-              <Text style={styles.webNotSupportedSubtext}>
-                Please use the mobile app (iOS or Android) to access the Google Maps integration for drawing flight areas.
-              </Text>
             </View>
           ) : (
-            <React.Fragment>
-              <View style={styles.mapWrapper}>
-                <WebView
-                  ref={webViewRef}
-                  source={{ html: getMapHTML() }}
-                  style={styles.webView}
-                  onMessage={handleWebViewMessage}
-                  javaScriptEnabled={true}
-                  domStorageEnabled={true}
-                  startInLoadingState={true}
-                  scrollEnabled={false}
-                  bounces={false}
-                  overScrollMode="never"
-                  showsVerticalScrollIndicator={false}
-                  showsHorizontalScrollIndicator={false}
-                  renderLoading={() => (
-                    <View style={styles.loadingContainer}>
-                      <ActivityIndicator size="large" color={colors.primary} />
-                      <Text style={styles.loadingText}>Loading Google Maps...</Text>
-                    </View>
-                  )}
-                />
-              </View>
-              <Text style={styles.mapHelpText}>
-                📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
+            <View 
+              style={styles.mapWrapper}
+              onStartShouldSetResponder={() => {
+                setIsMapTouched(true);
+                return false;
+              }}
+              onResponderRelease={() => {
+                setIsMapTouched(false);
+              }}
+            >
+              <WebView
+                ref={webViewRef}
+                source={{ html: getMapHTML() }}
+                style={styles.webView}
+                onMessage={handleWebViewMessage}
+                javaScriptEnabled={true}
+                domStorageEnabled={true}
+                startInLoadingState={true}
+                scrollEnabled={false}
+                bounces={false}
+                overScrollMode="never"
+                showsVerticalScrollIndicator={false}
+                showsHorizontalScrollIndicator={false}
+              />
+            </View>
+          )}
+
+          {drawnArea && (
+            <View style={styles.infoBox}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={16}
+                color={colors.success}
+              />
+              <Text style={[styles.infoText, { color: colors.success, fontSize: 11 }]}>
+                Area defined: {drawnArea.length} points
               </Text>
-              {drawnArea && (
-                <View style={styles.infoBox}>
-                  <IconSymbol
-                    ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check_circle"
-                    size={20}
-                    color={colors.success}
-                  />
-                  <Text style={[styles.infoText, { color: colors.success }]}>
-                    Area defined with {drawnArea.length} points. Ready to generate flight plan!
-                  </Text>
-                </View>
-              )}
-              <View style={styles.infoBox}>
-                <IconSymbol
-                  ios_icon_name="info.circle.fill"
-                  android_material_icon_name="info"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.infoText}>
-                  Using Google Maps with satellite imagery for accurate flight planning.
-                </Text>
-              </View>
-            </React.Fragment>
+            </View>
           )}
         </View>
 
-        {/* Mission Configuration */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Mission Configuration</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Mission Name</Text>
-            <TextInput
-              style={styles.input}
-              value={missionName}
-              onChangeText={setMissionName}
-              placeholder="DA3S Mapping 2"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Drone Model</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.droneSelector}>
-              {Object.entries(dronePresets).map(([key, preset]) => (
-                <Pressable
-                  key={key}
-                  style={[
-                    styles.droneCard,
-                    droneModel === key && styles.droneCardSelected,
-                  ]}
-                  onPress={() => handleDroneChange(key)}
-                >
-                  <IconSymbol
-                    ios_icon_name="airplane"
-                    android_material_icon_name="flight"
-                    size={24}
-                    color={droneModel === key ? colors.primary : colors.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.droneCardText,
-                      droneModel === key && styles.droneCardTextSelected,
-                    ]}
-                  >
-                    {preset.name}
-                  </Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Target Altitude (m) *</Text>
-              <Text style={styles.valueLabel}>{targetAGL} m</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={targetAGL}
-              onChangeText={setTargetAGL}
-              keyboardType="numeric"
-              placeholder="120"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.helpText}>
-              Flight altitude in meters (120m = 400ft)
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Flight Speed (m/s)</Text>
-              <Text style={styles.valueLabel}>{globalSpeed} m/s</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={globalSpeed}
-              onChangeText={setGlobalSpeed}
-              keyboardType="numeric"
-              placeholder="10"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.helpText}>
-              Flight speed in meters per second
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Gimbal Pitch (degrees)</Text>
-              <Text style={styles.valueLabel}>{gimbalPitch}°</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={gimbalPitch}
-              onChangeText={setGimbalPitch}
-              keyboardType="numeric"
-              placeholder="-90"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.helpText}>
-              -90° = straight down (nadir), -45° = oblique
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Photo Overlap (%)</Text>
-              <Text style={styles.valueLabel}>{photoOverlap}%</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={photoOverlap}
-              onChangeText={setPhotoOverlap}
-              keyboardType="numeric"
-              placeholder="75"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.helpText}>
-              Higher overlap = better 3D reconstruction but more photos
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Finish Action</Text>
-            <View style={styles.radioGroup}>
-              <Pressable
-                style={[styles.radioButton, finishAction === "gohome" && styles.radioButtonSelected]}
-                onPress={() => setFinishAction("gohome")}
-              >
-                <View style={[styles.radioCircle, finishAction === "gohome" && styles.radioCircleSelected]}>
-                  {finishAction === "gohome" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Go Home</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.radioButton, finishAction === "hover" && styles.radioButtonSelected]}
-                onPress={() => setFinishAction("hover")}
-              >
-                <View style={[styles.radioCircle, finishAction === "hover" && styles.radioCircleSelected]}>
-                  {finishAction === "hover" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Hover</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.radioButton, finishAction === "land" && styles.radioButtonSelected]}
-                onPress={() => setFinishAction("land")}
-              >
-                <View style={[styles.radioCircle, finishAction === "land" && styles.radioCircleSelected]}>
-                  {finishAction === "land" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Land</Text>
-              </Pressable>
-            </View>
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchLabel}>
-              <Text style={styles.label}>Exit Mission on RC Signal Lost</Text>
-              <Text style={styles.helpText}>Return to home if signal lost</Text>
-            </View>
-            <Switch
-              value={exitOnRCLost}
-              onValueChange={setExitOnRCLost}
-              trackColor={{ false: colors.textSecondary, true: colors.primary }}
-              thumbColor={colors.surface}
-            />
-          </View>
-        </View>
-
-        {/* Advanced Settings */}
-        <Pressable
-          style={styles.advancedToggle}
-          onPress={() => setShowAdvanced(!showAdvanced)}
+        {/* Scrollable Settings Section */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          scrollEnabled={!isMapTouched}
+          showsVerticalScrollIndicator={true}
         >
-          <Text style={styles.advancedToggleText}>Advanced Camera Settings</Text>
-          <IconSymbol
-            ios_icon_name={showAdvanced ? "chevron.up" : "chevron.down"}
-            android_material_icon_name={showAdvanced ? "expand_less" : "expand_more"}
-            size={20}
-            color={colors.textPrimary}
-          />
-        </Pressable>
-
-        {showAdvanced && (
           <View style={styles.formSection}>
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.label}>Sensor Width (mm)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={sensorWidth}
-                  onChangeText={setSensorWidth}
-                  keyboardType="numeric"
-                  placeholder="13.2"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.label}>Sensor Height (mm)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={sensorHeight}
-                  onChangeText={setSensorHeight}
-                  keyboardType="numeric"
-                  placeholder="8.8"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-            </View>
+            <Text style={styles.sectionTitle}>Mission Configuration</Text>
 
-            <View style={styles.inputRow}>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.label}>Camera FOV (°)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={cameraFOV}
-                  onChangeText={setCameraFOV}
-                  keyboardType="numeric"
-                  placeholder="84"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-              <View style={styles.inputGroupHalf}>
-                <Text style={styles.label}>Image Width (px)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={imageWidth}
-                  onChangeText={setImageWidth}
-                  keyboardType="numeric"
-                  placeholder="5472"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Drone Model</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.droneSelector}>
+                {Object.entries(dronePresets).map(([key, preset]) => (
+                  <Pressable
+                    key={key}
+                    style={[
+                      styles.droneCard,
+                      droneModel === key && styles.droneCardSelected,
+                    ]}
+                    onPress={() => handleDroneChange(key)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="airplane"
+                      android_material_icon_name="flight"
+                      size={20}
+                      color={droneModel === key ? colors.primary : colors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.droneCardText,
+                        droneModel === key && styles.droneCardTextSelected,
+                      ]}
+                    >
+                      {preset.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Image Height (px)</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Altitude (m)</Text>
+                <Text style={styles.valueLabel}>{targetAGL} m</Text>
+              </View>
               <TextInput
                 style={styles.input}
-                value={imageHeight}
-                onChangeText={setImageHeight}
+                value={targetAGL}
+                onChangeText={setTargetAGL}
                 keyboardType="numeric"
-                placeholder="3648"
+                placeholder="120"
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
-          </View>
-        )}
 
-        {/* Flight Statistics */}
-        {flightPlanData && (
-          <View style={styles.statsSection}>
-            <Text style={styles.sectionTitle}>Flight Statistics</Text>
-            <View style={styles.statsGrid}>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="map.fill"
-                  android_material_icon_name="map"
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={styles.statValue}>
-                  {flightPlanData.statistics.total_waypoints}
-                </Text>
-                <Text style={styles.statLabel}>Waypoints</Text>
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Speed (m/s)</Text>
+                <Text style={styles.valueLabel}>{globalSpeed} m/s</Text>
               </View>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="camera.fill"
-                  android_material_icon_name="camera_alt"
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={styles.statValue}>
-                  {flightPlanData.statistics.total_photos}
-                </Text>
-                <Text style={styles.statLabel}>Photos</Text>
-              </View>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="clock.fill"
-                  android_material_icon_name="schedule"
-                  size={24}
-                  color={colors.primaryDark}
-                />
-                <Text style={styles.statValue}>
-                  {flightPlanData.statistics.estimated_flight_time_minutes.toFixed(1)}
-                </Text>
-                <Text style={styles.statLabel}>Minutes</Text>
-              </View>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="arrow.left.arrow.right"
-                  android_material_icon_name="straighten"
-                  size={24}
-                  color={colors.primaryDark}
-                />
-                <Text style={styles.statValue}>
-                  {(flightPlanData.statistics.total_distance_meters / 1000).toFixed(2)}
-                </Text>
-                <Text style={styles.statLabel}>Kilometers</Text>
-              </View>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="battery.75"
-                  android_material_icon_name="battery_std"
-                  size={24}
-                  color={
-                    flightPlanData.statistics.estimated_battery_usage_percent > 80
-                      ? colors.error
-                      : colors.success
-                  }
-                />
-                <Text style={styles.statValue}>
-                  {flightPlanData.statistics.estimated_battery_usage_percent}%
-                </Text>
-                <Text style={styles.statLabel}>Battery</Text>
-              </View>
-              <View style={styles.statCard}>
-                <IconSymbol
-                  ios_icon_name="ruler"
-                  android_material_icon_name="straighten"
-                  size={24}
-                  color={colors.primaryDark}
-                />
-                <Text style={styles.statValue}>
-                  {flightPlanData.statistics.gsd_cm_per_pixel}
-                </Text>
-                <Text style={styles.statLabel}>GSD (cm/px)</Text>
-              </View>
+              <TextInput
+                style={styles.input}
+                value={globalSpeed}
+                onChangeText={setGlobalSpeed}
+                keyboardType="numeric"
+                placeholder="10"
+                placeholderTextColor={colors.textSecondary}
+              />
             </View>
 
-            {flightPlanData.statistics.estimated_battery_usage_percent > 80 && (
-              <View style={styles.warningBox}>
-                <IconSymbol
-                  ios_icon_name="exclamationmark.triangle.fill"
-                  android_material_icon_name="warning"
-                  size={20}
-                  color={colors.error}
-                />
-                <Text style={styles.warningText}>
-                  High battery usage! Consider reducing area or altitude.
-                </Text>
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Gimbal Pitch (°)</Text>
+                <Text style={styles.valueLabel}>{gimbalPitch}°</Text>
               </View>
-            )}
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionSection}>
-          <Button
-            onPress={handleGeneratePlan}
-            loading={isGenerating}
-            disabled={isGenerating}
-            style={styles.generateButton}
-          >
-            <View style={styles.buttonContent}>
-              <IconSymbol
-                ios_icon_name="wand.and.stars"
-                android_material_icon_name="auto_fix_high"
-                size={20}
-                color="#fff"
+              <TextInput
+                style={styles.input}
+                value={gimbalPitch}
+                onChangeText={setGimbalPitch}
+                keyboardType="numeric"
+                placeholder="-90"
+                placeholderTextColor={colors.textSecondary}
               />
-              <Text style={styles.buttonTextWhite}>
-                {isGenerating ? "Generating..." : "Generate Flight Plan"}
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Photo Overlap (%)</Text>
+                <Text style={styles.valueLabel}>{photoOverlap}%</Text>
+              </View>
+              <TextInput
+                style={styles.input}
+                value={photoOverlap}
+                onChangeText={setPhotoOverlap}
+                keyboardType="numeric"
+                placeholder="75"
+                placeholderTextColor={colors.textSecondary}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Grid Segmentation</Text>
+                <Text style={styles.valueLabel}>{segmentation}</Text>
+              </View>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderLabel}>Coarse</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={0}
+                  maximumValue={100}
+                  step={1}
+                  value={segmentation}
+                  onValueChange={setSegmentation}
+                  minimumTrackTintColor={colors.primary}
+                  maximumTrackTintColor={colors.textSecondary}
+                  thumbTintColor={colors.primary}
+                />
+                <Text style={styles.sliderLabel}>Fine</Text>
+              </View>
+              <Text style={styles.helpText}>
+                0 = coarse grid pattern, 100 = fine grid pattern
               </Text>
             </View>
-          </Button>
+
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.label}>Terrain Following</Text>
+                <Text style={styles.helpText}>Follow terrain elevation</Text>
+              </View>
+              <Switch
+                value={enableTerrainFollowing}
+                onValueChange={setEnableTerrainFollowing}
+                trackColor={{ false: colors.textSecondary, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
+            </View>
+          </View>
 
           {flightPlanData && (
-            <React.Fragment>
-              <Button
-                onPress={handleUploadToDrone}
-                loading={isUploading}
-                disabled={isUploading}
-                variant="secondary"
-                style={styles.actionButton}
-              >
-                <View style={styles.buttonContent}>
+            <View style={styles.statsSection}>
+              <Text style={styles.sectionTitle}>Flight Statistics</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statCard}>
                   <IconSymbol
-                    ios_icon_name="arrow.up.circle.fill"
-                    android_material_icon_name="upload"
+                    ios_icon_name="map.fill"
+                    android_material_icon_name="map"
                     size={20}
                     color={colors.primary}
                   />
-                  <Text style={[styles.buttonText, { color: colors.primary }]}>
-                    {isUploading ? "Uploading..." : "Upload to Drone"}
+                  <Text style={styles.statValue}>
+                    {flightPlanData.statistics.total_waypoints}
                   </Text>
+                  <Text style={styles.statLabel}>Waypoints</Text>
                 </View>
-              </Button>
-
-              <View style={styles.exportRow}>
-                <Pressable
-                  style={styles.exportButton}
-                  onPress={() => handleExport("json")}
-                >
+                <View style={styles.statCard}>
                   <IconSymbol
-                    ios_icon_name="doc.text"
-                    android_material_icon_name="description"
+                    ios_icon_name="camera.fill"
+                    android_material_icon_name="camera_alt"
                     size={20}
-                    color={colors.textPrimary}
+                    color={colors.primary}
                   />
-                  <Text style={styles.exportButtonText}>JSON</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.exportButton}
-                  onPress={() => handleExport("kml")}
-                >
+                  <Text style={styles.statValue}>
+                    {flightPlanData.statistics.total_photos}
+                  </Text>
+                  <Text style={styles.statLabel}>Photos</Text>
+                </View>
+                <View style={styles.statCard}>
                   <IconSymbol
-                    ios_icon_name="map"
-                    android_material_icon_name="map"
+                    ios_icon_name="clock.fill"
+                    android_material_icon_name="schedule"
                     size={20}
-                    color={colors.textPrimary}
+                    color={colors.primaryDark}
                   />
-                  <Text style={styles.exportButtonText}>KML</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.exportButton}
-                  onPress={() => handleExport("csv")}
-                >
+                  <Text style={styles.statValue}>
+                    {flightPlanData.statistics.estimated_flight_time_minutes.toFixed(1)}
+                  </Text>
+                  <Text style={styles.statLabel}>Minutes</Text>
+                </View>
+                <View style={styles.statCard}>
                   <IconSymbol
-                    ios_icon_name="tablecells"
-                    android_material_icon_name="table_chart"
+                    ios_icon_name="battery.75"
+                    android_material_icon_name="battery_std"
                     size={20}
-                    color={colors.textPrimary}
+                    color={
+                      flightPlanData.statistics.estimated_battery_usage_percent > 80
+                        ? colors.error
+                        : colors.success
+                    }
                   />
-                  <Text style={styles.exportButtonText}>CSV</Text>
-                </Pressable>
+                  <Text style={styles.statValue}>
+                    {flightPlanData.statistics.estimated_battery_usage_percent}%
+                  </Text>
+                  <Text style={styles.statLabel}>Battery</Text>
+                </View>
               </View>
-            </React.Fragment>
+            </View>
           )}
 
-          <Button
-            onPress={() => router.push("/drone-control")}
-            variant="outline"
-            style={styles.controlButton}
-          >
-            <View style={styles.buttonContent}>
+          <View style={styles.actionSection}>
+            <Button
+              onPress={handleGeneratePlan}
+              loading={isGenerating}
+              disabled={isGenerating}
+              style={styles.generateButton}
+            >
+              <View style={styles.buttonContent}>
+                <IconSymbol
+                  ios_icon_name="wand.and.stars"
+                  android_material_icon_name="auto_fix_high"
+                  size={20}
+                  color="#fff"
+                />
+                <Text style={styles.buttonTextWhite}>
+                  {isGenerating ? "Generating..." : "Generate Flight Plan"}
+                </Text>
+              </View>
+            </Button>
+
+            {flightPlanData && (
+              <React.Fragment>
+                <Button
+                  onPress={() => setShowFileTypeModal(true)}
+                  variant="secondary"
+                  style={styles.actionButton}
+                >
+                  <View style={styles.buttonContent}>
+                    <IconSymbol
+                      ios_icon_name="arrow.down.circle.fill"
+                      android_material_icon_name="download"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text style={[styles.buttonText, { color: colors.primary }]}>
+                      Download Flight Plan
+                    </Text>
+                  </View>
+                </Button>
+
+                <Button
+                  onPress={handleUploadToDrone}
+                  loading={isUploading}
+                  disabled={isUploading}
+                  variant="outline"
+                  style={styles.actionButton}
+                >
+                  <View style={styles.buttonContent}>
+                    <IconSymbol
+                      ios_icon_name="arrow.up.circle.fill"
+                      android_material_icon_name="upload"
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <Text style={[styles.buttonText, { color: colors.primary }]}>
+                      {isUploading ? "Uploading..." : "Upload to Drone"}
+                    </Text>
+                  </View>
+                </Button>
+              </React.Fragment>
+            )}
+          </View>
+        </ScrollView>
+      </View>
+
+      {/* File Type Selection Modal */}
+      <Modal
+        visible={showFileTypeModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFileTypeModal(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowFileTypeModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select File Type</Text>
+            <Text style={styles.modalSubtitle}>Choose the format for your flight plan download</Text>
+
+            <Pressable
+              style={styles.fileTypeOption}
+              onPress={() => handleDownload("json")}
+            >
               <IconSymbol
-                ios_icon_name="antenna.radiowaves.left.and.right"
-                android_material_icon_name="settings_remote"
-                size={20}
+                ios_icon_name="doc.text"
+                android_material_icon_name="description"
+                size={24}
                 color={colors.primary}
               />
-              <Text style={[styles.buttonText, { color: colors.primary }]}>
-                Go to Drone Control
-              </Text>
-            </View>
-          </Button>
-        </View>
-      </ScrollView>
+              <View style={styles.fileTypeInfo}>
+                <Text style={styles.fileTypeTitle}>JSON</Text>
+                <Text style={styles.fileTypeDescription}>Standard format for most applications</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron_right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+
+            <Pressable
+              style={styles.fileTypeOption}
+              onPress={() => handleDownload("kml")}
+            >
+              <IconSymbol
+                ios_icon_name="map"
+                android_material_icon_name="map"
+                size={24}
+                color={colors.primary}
+              />
+              <View style={styles.fileTypeInfo}>
+                <Text style={styles.fileTypeTitle}>KML</Text>
+                <Text style={styles.fileTypeDescription}>Google Earth compatible format</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron_right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+
+            <Pressable
+              style={styles.fileTypeOption}
+              onPress={() => handleDownload("csv")}
+            >
+              <IconSymbol
+                ios_icon_name="tablecells"
+                android_material_icon_name="table_chart"
+                size={24}
+                color={colors.primary}
+              />
+              <View style={styles.fileTypeInfo}>
+                <Text style={styles.fileTypeTitle}>CSV</Text>
+                <Text style={styles.fileTypeDescription}>Spreadsheet compatible format</Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron_right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </Pressable>
+
+            <Button
+              onPress={() => setShowFileTypeModal(false)}
+              variant="outline"
+              style={styles.cancelButton}
+            >
+              Cancel
+            </Button>
+          </View>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1206,60 +1057,47 @@ const styles = StyleSheet.create({
   placeholder: {
     width: 40,
   },
-  scrollView: {
+  contentContainer: {
     flex: 1,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 120,
+  mapSection: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+    backgroundColor: colors.backgroundLight,
   },
-  projectInfo: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  projectName: {
-    fontSize: 24,
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: "700",
     color: colors.textPrimary,
-    marginTop: 12,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: "center",
-    paddingHorizontal: 20,
-  },
-  mapContainer: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
   addressSearchContainer: {
     flexDirection: "row",
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   addressInput: {
     flex: 1,
-    height: 44,
+    height: 40,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 14,
+    fontSize: 13,
     borderWidth: 1,
     borderColor: colors.accentBorder,
     backgroundColor: colors.surface + "CC",
     color: colors.textPrimary,
   },
   searchButton: {
-    width: 44,
-    height: 44,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     backgroundColor: colors.primary,
     justifyContent: "center",
     alignItems: "center",
   },
   mapWrapper: {
-    height: 300,
+    height: 200,
     borderRadius: 12,
     overflow: "hidden",
     borderWidth: 1,
@@ -1269,282 +1107,174 @@ const styles = StyleSheet.create({
   webView: {
     flex: 1,
   },
-  loadingContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.surface,
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: colors.textSecondary,
-  },
   webNotSupported: {
-    height: 300,
+    height: 200,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.accentBorder,
     backgroundColor: colors.surface,
     justifyContent: "center",
     alignItems: "center",
-    padding: 32,
+    padding: 24,
   },
   webNotSupportedText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     color: colors.textPrimary,
     textAlign: "center",
-    marginTop: 16,
-  },
-  webNotSupportedSubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  mapHelpText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: "center",
+    marginTop: 12,
   },
   infoBox: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: colors.primary + "20",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    gap: 6,
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: colors.success + "20",
+    borderRadius: 6,
   },
   infoText: {
     flex: 1,
     fontSize: 12,
-    color: colors.primary,
-  },
-  formSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
     color: colors.textPrimary,
-    marginBottom: 8,
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 16,
-    lineHeight: 18,
-  },
-  droneSelector: {
-    flexDirection: "row",
-  },
-  droneCard: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-    marginRight: 12,
-    alignItems: "center",
-    minWidth: 120,
-  },
-  droneCardSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary + "20",
-  },
-  droneCardText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  droneCardTextSelected: {
-    color: colors.primary,
-    fontWeight: "600",
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputGroupHalf: {
+  scrollView: {
     flex: 1,
   },
-  inputRow: {
-    flexDirection: "row",
-    gap: 12,
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 120,
+  },
+  formSection: {
     marginBottom: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
   },
   labelRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 6,
   },
   label: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
     color: colors.textPrimary,
   },
   valueLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.primary,
   },
   input: {
-    height: 44,
+    height: 40,
     borderRadius: 8,
     paddingHorizontal: 12,
-    fontSize: 16,
+    fontSize: 14,
     borderWidth: 1,
     borderColor: colors.accentBorder,
     backgroundColor: colors.surface + "CC",
     color: colors.textPrimary,
   },
   helpText: {
-    fontSize: 12,
+    fontSize: 11,
     color: colors.textSecondary,
     marginTop: 4,
   },
-  radioGroup: {
+  droneSelector: {
     flexDirection: "row",
-    gap: 12,
-    flexWrap: "wrap",
   },
-  radioButton: {
-    flexDirection: "row",
-    alignItems: "center",
+  droneCard: {
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.accentBorder,
     backgroundColor: colors.surface + "CC",
-    flex: 1,
+    marginRight: 8,
+    alignItems: "center",
     minWidth: 100,
   },
-  radioButtonSelected: {
+  droneCardSelected: {
     borderColor: colors.primary,
     backgroundColor: colors.primary + "20",
   },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.textSecondary,
-    marginRight: 8,
+  droneCardText: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    marginTop: 6,
+    textAlign: "center",
+  },
+  droneCardTextSelected: {
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  sliderContainer: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 12,
   },
-  radioCircleSelected: {
-    borderColor: colors.primary,
+  slider: {
+    flex: 1,
+    height: 40,
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-  },
-  radioText: {
-    fontSize: 14,
-    color: colors.textPrimary,
+  sliderLabel: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    fontWeight: "600",
   },
   switchRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 10,
     backgroundColor: colors.surface + "CC",
     borderWidth: 1,
     borderColor: colors.accentBorder,
   },
   switchLabel: {
     flex: 1,
-    marginRight: 16,
-  },
-  advancedToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: colors.surface + "CC",
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    marginBottom: 16,
-  },
-  advancedToggleText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.textPrimary,
+    marginRight: 12,
   },
   statsSection: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     flex: 1,
-    minWidth: "30%",
+    minWidth: "47%",
     backgroundColor: colors.surface + "CC",
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    padding: 12,
     alignItems: "center",
     borderWidth: 1,
     borderColor: colors.accentBorder,
   },
   statValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
     color: colors.textPrimary,
-    marginTop: 8,
+    marginTop: 6,
   },
   statLabel: {
-    fontSize: 11,
+    fontSize: 10,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 2,
     textAlign: "center",
-  },
-  warningBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    backgroundColor: colors.error + "20",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.error,
-    gap: 12,
-    marginTop: 12,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.error,
-    fontWeight: "600",
   },
   actionSection: {
     marginTop: 8,
   },
   generateButton: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
   actionButton: {
-    marginBottom: 12,
-  },
-  controlButton: {
-    marginTop: 8,
+    marginBottom: 10,
   },
   buttonContent: {
     flexDirection: "row",
@@ -1553,34 +1283,68 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buttonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
   },
   buttonTextWhite: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: "#fff",
   },
-  exportRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  exportButton: {
+  modalOverlay: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: colors.surface + "CC",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
     borderWidth: 1,
     borderColor: colors.accentBorder,
   },
-  exportButtonText: {
-    fontSize: 14,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  fileTypeOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  fileTypeInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  fileTypeTitle: {
+    fontSize: 16,
     fontWeight: "600",
     color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  fileTypeDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  cancelButton: {
+    marginTop: 8,
   },
 });

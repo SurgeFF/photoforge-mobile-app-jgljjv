@@ -457,7 +457,7 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
       ]}
     >
       <View style={styles.featureContent}>
-        <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
+        <View style={styles.iconContainer}>
           <IconSymbol
             ios_icon_name={icon}
             android_material_icon_name={androidIcon}
@@ -660,7 +660,6 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     width: "48%",
-    backgroundColor: colors.surface + 'CC',
     borderRadius: 16,
     padding: 16,
     minHeight: 160,
