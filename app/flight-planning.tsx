@@ -10,6 +10,7 @@ import {
   Platform,
   Pressable,
   ActivityIndicator,
+  Switch,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -22,7 +23,7 @@ import { generateFlightPlan, djiUploadFlightPlan } from "@/utils/apiClient";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const GOOGLE_MAPS_API_KEY_STORAGE = "@photoforge_google_maps_api_key";
+const GOOGLE_MAPS_API_KEY_STORAGE = "@google_maps_api_key";
 
 interface FlightPlanMetadata {
   total_waypoints: number;
@@ -48,12 +49,25 @@ export default function FlightPlanningScreen() {
   const projectName = params.projectName as string;
   const webViewRef = useRef<WebView>(null);
 
-  // Flight parameters
-  const [altitude, setAltitude] = useState("120");
-  const [overlap, setOverlap] = useState("70");
-  const [speed, setSpeed] = useState("10");
-  const [gimbalAngle, setGimbalAngle] = useState("-90");
-  
+  // Mission Configuration
+  const [missionName, setMissionName] = useState("DA3S Mapping");
+  const [droneModel, setDroneModel] = useState("phantom4pro");
+  const [targetAGL, setTargetAGL] = useState("164");
+  const [globalSpeed, setGlobalSpeed] = useState("5");
+  const [gimbalPitch, setGimbalPitch] = useState("-90");
+  const [finishAction, setFinishAction] = useState("gohome");
+  const [exitOnRCLost, setExitOnRCLost] = useState(true);
+
+  // Terrain Following
+  const [enableTerrainFollowing, setEnableTerrainFollowing] = useState(false);
+  const [minClearance, setMinClearance] = useState("50");
+  const [obstacleSafetyMargin, setObstacleSafetyMargin] = useState("30");
+
+  // Grid Pattern Generator
+  const [gridSpacing, setGridSpacing] = useState("medium");
+  const [photoOverlap, setPhotoOverlap] = useState("70");
+  const [flightLineSpacing, setFlightLineSpacing] = useState("auto");
+
   // Camera specs (DJI Phantom 4 Pro defaults)
   const [sensorWidth, setSensorWidth] = useState("13.2");
   const [sensorHeight, setSensorHeight] = useState("8.8");
@@ -70,10 +84,8 @@ export default function FlightPlanningScreen() {
   } | null>(null);
   const [drawnArea, setDrawnArea] = useState<any>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [selectedDrone, setSelectedDrone] = useState("phantom4pro");
-  const [mapProvider, setMapProvider] = useState<"osm" | "google">("osm");
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState("");
-  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
 
   // Load saved Google Maps API key
   useEffect(() => {
@@ -86,6 +98,8 @@ export default function FlightPlanningScreen() {
       if (savedKey) {
         setGoogleMapsApiKey(savedKey);
         console.log("✅ Loaded saved Google Maps API key");
+      } else {
+        console.log("⚠️ No Google Maps API key found. Map will use OpenStreetMap.");
       }
     } catch (error) {
       console.error("❌ Error loading Google Maps API key:", error);
@@ -127,6 +141,14 @@ export default function FlightPlanningScreen() {
       image_width: 5280,
       image_height: 3956,
     },
+    matrice30: {
+      name: "DJI Matrice 30",
+      sensor_width: 17.3,
+      sensor_height: 13.0,
+      focal_length: 24,
+      image_width: 8000,
+      image_height: 6000,
+    },
     air2s: {
       name: "DJI Air 2S",
       sensor_width: 13.2,
@@ -146,7 +168,7 @@ export default function FlightPlanningScreen() {
   };
 
   const handleDroneChange = (droneKey: string) => {
-    setSelectedDrone(droneKey);
+    setDroneModel(droneKey);
     const preset = dronePresets[droneKey];
     if (preset) {
       setSensorWidth(preset.sensor_width.toString());
@@ -158,7 +180,7 @@ export default function FlightPlanningScreen() {
   };
 
   const handleGeneratePlan = async () => {
-    if (!altitude || !overlap) {
+    if (!targetAGL || !photoOverlap) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
@@ -175,11 +197,11 @@ export default function FlightPlanningScreen() {
       return;
     }
 
-    const altitudeNum = parseInt(altitude);
-    if (altitudeNum > 120) {
+    const altitudeNum = parseInt(targetAGL);
+    if (altitudeNum > 400) {
       Alert.alert(
         "Altitude Warning",
-        "Altitude exceeds 120m (400ft). This may violate local regulations in many countries. Continue anyway?",
+        "Altitude exceeds 400ft (120m). This may violate local regulations in many countries. Continue anyway?",
         [
           { text: "Cancel", style: "cancel" },
           { text: "Continue", onPress: () => generatePlan() },
@@ -196,11 +218,18 @@ export default function FlightPlanningScreen() {
 
     try {
       console.log("🛫 Generating flight plan with parameters:", {
-        altitude: parseInt(altitude),
-        overlap: parseInt(overlap),
-        speed: parseInt(speed),
-        gimbalAngle: parseInt(gimbalAngle),
+        altitude: parseInt(targetAGL),
+        overlap: parseInt(photoOverlap),
+        speed: parseInt(globalSpeed),
+        gimbalAngle: parseInt(gimbalPitch),
+        terrainFollowing: enableTerrainFollowing,
+        gridSpacing: gridSpacing,
       });
+
+      // Calculate spacing based on grid setting
+      let spacingMultiplier = 1.0;
+      if (gridSpacing === "fine") spacingMultiplier = 0.7;
+      else if (gridSpacing === "coarse") spacingMultiplier = 1.5;
 
       const result = await generateFlightPlan({
         area: drawnArea || {
@@ -215,23 +244,26 @@ export default function FlightPlanningScreen() {
             ],
           ],
         },
-        altitude: parseInt(altitude),
-        overlap: parseInt(overlap),
+        altitude: parseInt(targetAGL) * 0.3048, // Convert feet to meters
+        overlap: parseInt(photoOverlap),
         drone_specs: {
           sensor_width: parseFloat(sensorWidth),
           sensor_height: parseFloat(sensorHeight),
           focal_length: parseFloat(focalLength),
           image_width: parseInt(imageWidth),
           image_height: parseInt(imageHeight),
-          max_speed: parseInt(speed),
-          gimbal_angle: parseInt(gimbalAngle),
+          max_speed: parseInt(globalSpeed),
+          gimbal_angle: parseInt(gimbalPitch),
+          spacing_multiplier: spacingMultiplier,
+          terrain_following: enableTerrainFollowing,
+          min_clearance: enableTerrainFollowing ? parseFloat(minClearance) * 0.3048 : undefined,
+          obstacle_margin: enableTerrainFollowing ? parseFloat(obstacleSafetyMargin) * 0.3048 : undefined,
         },
       });
 
       console.log("📊 Flight plan result:", result);
 
       if (result.success) {
-        // Handle different response formats from backend
         const planData = result.data?.data || result.data;
         
         if (planData && planData.waypoints && planData.metadata) {
@@ -284,9 +316,12 @@ export default function FlightPlanningScreen() {
 
     try {
       const result = await djiUploadFlightPlan(flightPlanData.waypoints, {
-        altitude: parseInt(altitude),
-        speed: parseInt(speed),
-        gimbal_angle: parseInt(gimbalAngle),
+        mission_name: missionName,
+        altitude: parseInt(targetAGL) * 0.3048,
+        speed: parseInt(globalSpeed),
+        gimbal_angle: parseInt(gimbalPitch),
+        finish_action: finishAction,
+        exit_on_rc_lost: exitOnRCLost,
       });
 
       if (result.success) {
@@ -318,8 +353,6 @@ export default function FlightPlanningScreen() {
       return;
     }
 
-    // For now, just show the data in an alert
-    // In a real implementation, this would download the file
     let exportData = "";
     
     if (format === "json") {
@@ -347,35 +380,16 @@ export default function FlightPlanningScreen() {
         Alert.alert("Area Defined", "Flight area has been defined. You can now generate the flight plan.");
       } else if (data.type === "map_ready") {
         console.log("✅ Map is ready");
+        setMapReady(true);
       }
     } catch (error) {
       console.error("❌ Error parsing WebView message:", error);
     }
   };
 
-  const handleSaveApiKey = () => {
-    if (googleMapsApiKey.trim()) {
-      saveGoogleMapsApiKey(googleMapsApiKey.trim());
-      setShowApiKeyInput(false);
-      Alert.alert(
-        "API Key Saved",
-        "Your Google Maps API key has been saved. You can now use Google Maps.",
-        [
-          {
-            text: "Use Google Maps",
-            onPress: () => setMapProvider("google"),
-          },
-          { text: "OK" },
-        ]
-      );
-    } else {
-      Alert.alert("Error", "Please enter a valid API key");
-    }
-  };
-
-  // Generate map HTML based on provider
+  // Generate map HTML
   const getMapHTML = () => {
-    if (mapProvider === "google" && googleMapsApiKey) {
+    if (googleMapsApiKey) {
       return `
         <!DOCTYPE html>
         <html>
@@ -432,7 +446,7 @@ export default function FlightPlanningScreen() {
                   const point = path.getAt(i);
                   coordinates.push([point.lng(), point.lat()]);
                 }
-                coordinates.push(coordinates[0]); // Close the polygon
+                coordinates.push(coordinates[0]);
 
                 const area = {
                   type: 'Polygon',
@@ -453,7 +467,6 @@ export default function FlightPlanningScreen() {
             }
 
             function displayWaypoints(waypoints) {
-              // Clear existing markers
               waypointMarkers.forEach(marker => marker.setMap(null));
               waypointMarkers = [];
 
@@ -491,7 +504,6 @@ export default function FlightPlanningScreen() {
                 bounds.extend({ lat: wp.lat, lng: wp.lon });
               });
 
-              // Draw flight path
               if (waypoints.length > 1) {
                 const path = waypoints.map(wp => ({ lat: wp.lat, lng: wp.lon }));
                 const flightPath = new google.maps.Polyline({
@@ -596,7 +608,6 @@ export default function FlightPlanningScreen() {
               map.fitBounds(bounds, { padding: [50, 50] });
             }
             
-            // Draw flight path
             if (waypoints.length > 1) {
               var latlngs = waypoints.map(wp => [wp.lat, wp.lon]);
               var polyline = L.polyline(latlngs, { color: '#2196F3', weight: 2, dashArray: '5, 10' }).addTo(map);
@@ -646,134 +657,6 @@ export default function FlightPlanningScreen() {
           </Text>
         </View>
 
-        {/* Map Provider Selection */}
-        <View style={styles.mapProviderSection}>
-          <Text style={styles.sectionTitle}>Map Provider</Text>
-          <View style={styles.mapProviderButtons}>
-            <Pressable
-              style={[
-                styles.mapProviderButton,
-                mapProvider === "osm" && styles.mapProviderButtonActive,
-              ]}
-              onPress={() => setMapProvider("osm")}
-            >
-              <IconSymbol
-                ios_icon_name="map"
-                android_material_icon_name="map"
-                size={20}
-                color={mapProvider === "osm" ? colors.surface : colors.textPrimary}
-              />
-              <Text
-                style={[
-                  styles.mapProviderButtonText,
-                  mapProvider === "osm" && styles.mapProviderButtonTextActive,
-                ]}
-              >
-                OpenStreetMap
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.mapProviderButton,
-                mapProvider === "google" && styles.mapProviderButtonActive,
-              ]}
-              onPress={() => {
-                if (!googleMapsApiKey) {
-                  Alert.alert(
-                    "Google Maps API Key Required",
-                    "You need to configure your Google Maps API key to use Google Maps. Would you like to add it now?",
-                    [
-                      { text: "Cancel", style: "cancel" },
-                      { text: "Add API Key", onPress: () => setShowApiKeyInput(true) },
-                    ]
-                  );
-                } else {
-                  setMapProvider("google");
-                }
-              }}
-            >
-              <IconSymbol
-                ios_icon_name="map.fill"
-                android_material_icon_name="satellite"
-                size={20}
-                color={mapProvider === "google" ? colors.surface : colors.textPrimary}
-              />
-              <Text
-                style={[
-                  styles.mapProviderButtonText,
-                  mapProvider === "google" && styles.mapProviderButtonTextActive,
-                ]}
-              >
-                Google Maps
-              </Text>
-            </Pressable>
-          </View>
-          
-          {/* Google Maps API Key Configuration */}
-          {showApiKeyInput && (
-            <View style={styles.apiKeySection}>
-              <Text style={styles.apiKeyTitle}>Configure Google Maps API Key</Text>
-              <Text style={styles.apiKeyHelp}>
-                To use Google Maps, you need to provide your own API key. Get one from the Google Cloud Console:
-              </Text>
-              <Text style={styles.apiKeySteps}>
-                1. Go to console.cloud.google.com{'\n'}
-                2. Create a project or select existing{'\n'}
-                3. Enable Maps JavaScript API{'\n'}
-                4. Create credentials (API Key){'\n'}
-                5. Paste your API key below
-              </Text>
-              <TextInput
-                style={styles.apiKeyInput}
-                value={googleMapsApiKey}
-                onChangeText={setGoogleMapsApiKey}
-                placeholder="AIzaSy..."
-                placeholderTextColor={colors.textSecondary}
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline={false}
-              />
-              <View style={styles.apiKeyButtons}>
-                <Button
-                  onPress={() => setShowApiKeyInput(false)}
-                  variant="outline"
-                  style={styles.apiKeyButton}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onPress={handleSaveApiKey}
-                  style={styles.apiKeyButton}
-                >
-                  Save API Key
-                </Button>
-              </View>
-            </View>
-          )}
-
-          {googleMapsApiKey && !showApiKeyInput && (
-            <View style={styles.apiKeyStatus}>
-              <IconSymbol
-                ios_icon_name="checkmark.circle.fill"
-                android_material_icon_name="check_circle"
-                size={20}
-                color={colors.success}
-              />
-              <Text style={styles.apiKeyStatusText}>
-                Google Maps API key configured
-              </Text>
-              <Pressable onPress={() => setShowApiKeyInput(true)}>
-                <IconSymbol
-                  ios_icon_name="pencil"
-                  android_material_icon_name="edit"
-                  size={20}
-                  color={colors.primary}
-                />
-              </Pressable>
-            </View>
-          )}
-        </View>
-
         {/* Interactive Map */}
         <View style={styles.mapContainer}>
           <Text style={styles.sectionTitle}>Define Flight Area</Text>
@@ -797,129 +680,285 @@ export default function FlightPlanningScreen() {
           <Text style={styles.mapHelpText}>
             📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
           </Text>
+          {!googleMapsApiKey && (
+            <View style={styles.infoBox}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={styles.infoText}>
+                Using OpenStreetMap. Add Google Maps API key in settings for satellite imagery.
+              </Text>
+            </View>
+          )}
         </View>
 
-        {/* Drone Selection */}
+        {/* Mission Configuration */}
         <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Drone Model</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.droneSelector}>
-            {Object.entries(dronePresets).map(([key, preset]) => (
-              <Pressable
-                key={key}
-                style={[
-                  styles.droneCard,
-                  selectedDrone === key && styles.droneCardSelected,
-                ]}
-                onPress={() => handleDroneChange(key)}
-              >
-                <IconSymbol
-                  ios_icon_name="airplane"
-                  android_material_icon_name="flight"
-                  size={24}
-                  color={selectedDrone === key ? colors.primary : colors.textSecondary}
-                />
-                <Text
+          <Text style={styles.sectionTitle}>Mission Configuration</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Mission Name</Text>
+            <TextInput
+              style={styles.input}
+              value={missionName}
+              onChangeText={setMissionName}
+              placeholder="DA3S Mapping 2"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Drone Model</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.droneSelector}>
+              {Object.entries(dronePresets).map(([key, preset]) => (
+                <Pressable
+                  key={key}
                   style={[
-                    styles.droneCardText,
-                    selectedDrone === key && styles.droneCardTextSelected,
+                    styles.droneCard,
+                    droneModel === key && styles.droneCardSelected,
                   ]}
+                  onPress={() => handleDroneChange(key)}
                 >
-                  {preset.name}
-                </Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Flight Parameters */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Flight Parameters</Text>
+                  <IconSymbol
+                    ios_icon_name="airplane"
+                    android_material_icon_name="flight"
+                    size={24}
+                    color={droneModel === key ? colors.primary : colors.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.droneCardText,
+                      droneModel === key && styles.droneCardTextSelected,
+                    ]}
+                  >
+                    {preset.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Altitude (meters) *</Text>
-              <Text style={styles.valueLabel}>{altitude}m</Text>
+              <Text style={styles.label}>Target AGL (ft) *</Text>
+              <Text style={styles.valueLabel}>{targetAGL} ft</Text>
             </View>
-            <View style={styles.sliderContainer}>
-              <Text style={styles.sliderLabel}>50m</Text>
-              <TextInput
-                style={styles.sliderInput}
-                value={altitude}
-                onChangeText={setAltitude}
-                keyboardType="numeric"
-                placeholder="120"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={styles.sliderLabel}>150m</Text>
-            </View>
+            <TextInput
+              style={styles.input}
+              value={targetAGL}
+              onChangeText={setTargetAGL}
+              keyboardType="numeric"
+              placeholder="164"
+              placeholderTextColor={colors.textSecondary}
+            />
             <Text style={styles.helpText}>
-              Recommended: 80-120m. Max 120m in most countries.
+              Above Ground Level altitude in feet
             </Text>
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Image Overlap (%) *</Text>
-              <Text style={styles.valueLabel}>{overlap}%</Text>
+              <Text style={styles.label}>Global Speed (m/s)</Text>
+              <Text style={styles.valueLabel}>{globalSpeed} m/s</Text>
             </View>
-            <View style={styles.sliderContainer}>
-              <Text style={styles.sliderLabel}>60%</Text>
-              <TextInput
-                style={styles.sliderInput}
-                value={overlap}
-                onChangeText={setOverlap}
-                keyboardType="numeric"
-                placeholder="70"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={styles.sliderLabel}>85%</Text>
-            </View>
+            <TextInput
+              style={styles.input}
+              value={globalSpeed}
+              onChangeText={setGlobalSpeed}
+              keyboardType="numeric"
+              placeholder="5"
+              placeholderTextColor={colors.textSecondary}
+            />
             <Text style={styles.helpText}>
-              Higher overlap = better 3D reconstruction but more photos
+              Flight speed in meters per second
             </Text>
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Flight Speed (m/s)</Text>
-              <Text style={styles.valueLabel}>{speed} m/s</Text>
+              <Text style={styles.label}>Gimbal Pitch (degrees)</Text>
+              <Text style={styles.valueLabel}>{gimbalPitch}°</Text>
             </View>
-            <View style={styles.sliderContainer}>
-              <Text style={styles.sliderLabel}>3</Text>
-              <TextInput
-                style={styles.sliderInput}
-                value={speed}
-                onChangeText={setSpeed}
-                keyboardType="numeric"
-                placeholder="10"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={styles.sliderLabel}>15</Text>
-            </View>
-            <Text style={styles.helpText}>
-              Slower = more stable imagery. Recommended: 5-10 m/s
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Gimbal Angle (degrees)</Text>
-              <Text style={styles.valueLabel}>{gimbalAngle}°</Text>
-            </View>
-            <View style={styles.sliderContainer}>
-              <Text style={styles.sliderLabel}>-90°</Text>
-              <TextInput
-                style={styles.sliderInput}
-                value={gimbalAngle}
-                onChangeText={setGimbalAngle}
-                keyboardType="numeric"
-                placeholder="-90"
-                placeholderTextColor={colors.textSecondary}
-              />
-              <Text style={styles.sliderLabel}>-45°</Text>
-            </View>
+            <TextInput
+              style={styles.input}
+              value={gimbalPitch}
+              onChangeText={setGimbalPitch}
+              keyboardType="numeric"
+              placeholder="-90"
+              placeholderTextColor={colors.textSecondary}
+            />
             <Text style={styles.helpText}>
               -90° = straight down (nadir), -45° = oblique
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Finish Action</Text>
+            <View style={styles.radioGroup}>
+              <Pressable
+                style={[styles.radioButton, finishAction === "gohome" && styles.radioButtonSelected]}
+                onPress={() => setFinishAction("gohome")}
+              >
+                <View style={[styles.radioCircle, finishAction === "gohome" && styles.radioCircleSelected]}>
+                  {finishAction === "gohome" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Go Home</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.radioButton, finishAction === "hover" && styles.radioButtonSelected]}
+                onPress={() => setFinishAction("hover")}
+              >
+                <View style={[styles.radioCircle, finishAction === "hover" && styles.radioCircleSelected]}>
+                  {finishAction === "hover" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Hover</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.radioButton, finishAction === "land" && styles.radioButtonSelected]}
+                onPress={() => setFinishAction("land")}
+              >
+                <View style={[styles.radioCircle, finishAction === "land" && styles.radioCircleSelected]}>
+                  {finishAction === "land" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Land</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>Exit Mission on RC Signal Lost</Text>
+              <Text style={styles.helpText}>Return to home if signal lost</Text>
+            </View>
+            <Switch
+              value={exitOnRCLost}
+              onValueChange={setExitOnRCLost}
+              trackColor={{ false: colors.textSecondary, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+        </View>
+
+        {/* Terrain Following */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Terrain Following</Text>
+          <Text style={styles.sectionSubtitle}>
+            Configure before generating grid. Uses Google Elevation API to adjust waypoint altitudes based on ground elevation.
+          </Text>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Min Clearance (ft)</Text>
+              <Text style={styles.valueLabel}>{minClearance} ft</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={minClearance}
+              onChangeText={setMinClearance}
+              keyboardType="numeric"
+              placeholder="50"
+              placeholderTextColor={colors.textSecondary}
+              editable={enableTerrainFollowing}
+            />
+            <Text style={styles.helpText}>
+              Minimum clearance above terrain
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Obstacle Safety Margin (ft)</Text>
+              <Text style={styles.valueLabel}>{obstacleSafetyMargin} ft</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={obstacleSafetyMargin}
+              onChangeText={setObstacleSafetyMargin}
+              keyboardType="numeric"
+              placeholder="30"
+              placeholderTextColor={colors.textSecondary}
+              editable={enableTerrainFollowing}
+            />
+            <Text style={styles.helpText}>
+              Additional safety buffer for obstacles
+            </Text>
+          </View>
+
+          <View style={styles.switchRow}>
+            <View style={styles.switchLabel}>
+              <Text style={styles.label}>Enable Terrain Following</Text>
+              <Text style={styles.helpText}>Maintain consistent AGL throughout mission</Text>
+            </View>
+            <Switch
+              value={enableTerrainFollowing}
+              onValueChange={setEnableTerrainFollowing}
+              trackColor={{ false: colors.textSecondary, true: colors.primary }}
+              thumbColor={colors.surface}
+            />
+          </View>
+        </View>
+
+        {/* Grid Pattern Generator */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Grid Pattern Generator</Text>
+          <Text style={styles.sectionSubtitle}>
+            Draw a survey area first by clicking "Draw Area" above, then click on the map to define your polygon
+          </Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Flight Path Segmentation</Text>
+            <View style={styles.radioGroup}>
+              <Pressable
+                style={[styles.radioButton, gridSpacing === "fine" && styles.radioButtonSelected]}
+                onPress={() => setGridSpacing("fine")}
+              >
+                <View style={[styles.radioCircle, gridSpacing === "fine" && styles.radioCircleSelected]}>
+                  {gridSpacing === "fine" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Fine</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.radioButton, gridSpacing === "medium" && styles.radioButtonSelected]}
+                onPress={() => setGridSpacing("medium")}
+              >
+                <View style={[styles.radioCircle, gridSpacing === "medium" && styles.radioCircleSelected]}>
+                  {gridSpacing === "medium" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Medium</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.radioButton, gridSpacing === "coarse" && styles.radioButtonSelected]}
+                onPress={() => setGridSpacing("coarse")}
+              >
+                <View style={[styles.radioCircle, gridSpacing === "coarse" && styles.radioCircleSelected]}>
+                  {gridSpacing === "coarse" && <View style={styles.radioInner} />}
+                </View>
+                <Text style={styles.radioText}>Coarse</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.helpText}>
+              Fine = More waypoints, better coverage. Coarse = Fewer waypoints, faster mission
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Photo Overlap (%)</Text>
+              <Text style={styles.valueLabel}>{photoOverlap}%</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={photoOverlap}
+              onChangeText={setPhotoOverlap}
+              keyboardType="numeric"
+              placeholder="70"
+              placeholderTextColor={colors.textSecondary}
+            />
+            <Text style={styles.helpText}>
+              Higher overlap = better 3D reconstruction but more photos
             </Text>
           </View>
         </View>
@@ -1264,97 +1303,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     paddingHorizontal: 20,
   },
-  mapProviderSection: {
-    marginBottom: 24,
-  },
-  mapProviderButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  mapProviderButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    backgroundColor: colors.surface + "CC",
-    borderWidth: 2,
-    borderColor: colors.accentBorder,
-  },
-  mapProviderButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  mapProviderButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  mapProviderButtonTextActive: {
-    color: colors.surface,
-  },
-  apiKeySection: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: colors.surface + "CC",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-  },
-  apiKeyTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  apiKeyHelp: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginBottom: 12,
-  },
-  apiKeySteps: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  apiKeyInput: {
-    height: 44,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.backgroundLight,
-    color: colors.textPrimary,
-    marginBottom: 12,
-  },
-  apiKeyButtons: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  apiKeyButton: {
-    flex: 1,
-  },
-  apiKeyStatus: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: colors.success + "20",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.success,
-  },
-  apiKeyStatusText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.success,
-    fontWeight: "600",
-  },
   mapContainer: {
     marginBottom: 24,
   },
@@ -1390,6 +1338,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: "center",
   },
+  infoBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.primary,
+  },
   formSection: {
     marginBottom: 24,
   },
@@ -1397,7 +1361,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "700",
     color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
     marginBottom: 16,
+    lineHeight: 18,
   },
   droneSelector: {
     flexDirection: "row",
@@ -1453,27 +1423,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: colors.primary,
   },
-  sliderContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  sliderInput: {
-    flex: 1,
-    height: 44,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-    color: colors.textPrimary,
-    textAlign: "center",
-  },
   input: {
     height: 44,
     borderRadius: 8,
@@ -1488,6 +1437,63 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 4,
+  },
+  radioGroup: {
+    flexDirection: "row",
+    gap: 12,
+    flexWrap: "wrap",
+  },
+  radioButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+    flex: 1,
+    minWidth: 100,
+  },
+  radioButtonSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + "20",
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: colors.textSecondary,
+    marginRight: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioCircleSelected: {
+    borderColor: colors.primary,
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.primary,
+  },
+  radioText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  switchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.surface + "CC",
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  switchLabel: {
+    flex: 1,
+    marginRight: 16,
   },
   advancedToggle: {
     flexDirection: "row",

@@ -13,12 +13,11 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { router } from "expo-router";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { getProjects, getAccessKey } from "@/utils/apiClient";
+import { getProjectsMobile, getAccessKey } from "@/utils/apiClient";
 
 interface Project {
   id: string;
@@ -26,6 +25,7 @@ interface Project {
   location?: string;
   status: string;
   created_at: string;
+  created_date?: string;
   updated_at?: string;
 }
 
@@ -48,14 +48,18 @@ export default function ProjectsScreen() {
         return;
       }
 
-      const result = await getProjects(accessKey);
+      console.log("📂 Loading projects from mobile endpoint...");
+      const result = await getProjectsMobile(accessKey);
+      
       if (result.success && result.data) {
+        console.log("✅ Projects loaded:", result.data.length);
         setProjects(result.data);
       } else {
+        console.error("❌ Failed to load projects:", result.error);
         Alert.alert("Error", result.error || "Failed to load projects");
       }
     } catch (error) {
-      console.error("Error loading projects:", error);
+      console.error("❌ Error loading projects:", error);
       Alert.alert("Error", "Failed to load projects");
     } finally {
       setIsLoading(false);
@@ -98,7 +102,7 @@ export default function ProjectsScreen() {
         </View>
       )}
       <Text style={styles.projectDate}>
-        Created: {new Date(item.created_at).toLocaleDateString()}
+        Created: {new Date(item.created_at || item.created_date || Date.now()).toLocaleDateString()}
       </Text>
       <View style={styles.projectFooter}>
         <IconSymbol

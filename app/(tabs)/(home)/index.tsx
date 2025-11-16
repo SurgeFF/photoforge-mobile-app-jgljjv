@@ -17,7 +17,7 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
-import { validateAccessKey, getProjects } from "@/utils/apiClient";
+import { validateAccessKey, getProjectsMobile } from "@/utils/apiClient";
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
@@ -43,9 +43,11 @@ export default function HomeScreen() {
 
   const loadProjects = async () => {
     try {
-      const result = await getProjects(accessKey);
+      console.log("📂 Loading projects count...");
+      const result = await getProjectsMobile(accessKey);
       if (result.success && result.data) {
         setProjectCount(result.data.length);
+        console.log("✅ Project count:", result.data.length);
       }
     } catch (error) {
       console.error("[HomeScreen] Error loading projects:", error);
