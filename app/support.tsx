@@ -20,10 +20,10 @@ import Button from "@/components/button";
 import { submitSupportTicket, getAccessKey } from "@/utils/apiClient";
 
 const CATEGORIES = [
-  { value: "technical", label: "Technical Issue" },
-  { value: "billing", label: "Billing Question" },
-  { value: "feature", label: "Feature Request" },
-  { value: "general", label: "General Inquiry" },
+  { value: "technical", label: "Technical Issue", icon: "wrench.and.screwdriver", androidIcon: "build" },
+  { value: "billing", label: "Billing Question", icon: "creditcard", androidIcon: "payment" },
+  { value: "feature", label: "Feature Request", icon: "lightbulb", androidIcon: "lightbulb" },
+  { value: "general", label: "General Inquiry", icon: "bubble.left.and.bubble.right", androidIcon: "chat" },
 ];
 
 export default function SupportScreen() {
@@ -82,6 +82,8 @@ export default function SupportScreen() {
     }
   };
 
+  const selectedCategory = CATEGORIES.find(cat => cat.value === category);
+
   return (
     <SafeAreaView style={styles.container}>
       <TopographicBackground />
@@ -104,8 +106,8 @@ export default function SupportScreen() {
       >
         <View style={styles.iconContainer}>
           <IconSymbol
-            ios_icon_name="questionmark.circle.fill"
-            android_material_icon_name="help"
+            ios_icon_name="headphones"
+            android_material_icon_name="support_agent"
             size={48}
             color={colors.primary}
           />
@@ -130,6 +132,12 @@ export default function SupportScreen() {
                   ]}
                   onPress={() => setCategory(cat.value)}
                 >
+                  <IconSymbol
+                    ios_icon_name={cat.icon}
+                    android_material_icon_name={cat.androidIcon}
+                    size={16}
+                    color={category === cat.value ? colors.surface : colors.textPrimary}
+                  />
                   <Text
                     style={[
                       styles.categoryText,
@@ -280,6 +288,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   categoryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,

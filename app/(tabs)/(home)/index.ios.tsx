@@ -397,8 +397,8 @@ export default function HomeScreen() {
           />
 
           <FeatureCard
-            icon="questionmark.circle.fill"
-            androidIcon="help"
+            icon="headphones"
+            androidIcon="support_agent"
             title="Support"
             description="Get help and submit tickets"
             onPress={() => router.push("/support")}
