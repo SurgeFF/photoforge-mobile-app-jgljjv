@@ -44,6 +44,86 @@ interface ProcessingStatus {
   error?: string;
 }
 
+interface CoordinateSystem {
+  code: string;
+  name: string;
+  category: string;
+}
+
+// Comprehensive list of coordinate systems from Autodesk Reality Capture API
+const COORDINATE_SYSTEMS: CoordinateSystem[] = [
+  // Geographic Coordinate Systems
+  { code: "WGS84", name: "WGS 84 (World Geodetic System 1984)", category: "Geographic" },
+  { code: "NAD83", name: "NAD 83 (North American Datum 1983)", category: "Geographic" },
+  { code: "NAD27", name: "NAD 27 (North American Datum 1927)", category: "Geographic" },
+  { code: "ETRS89", name: "ETRS89 (European Terrestrial Reference System 1989)", category: "Geographic" },
+  { code: "GDA94", name: "GDA94 (Geocentric Datum of Australia 1994)", category: "Geographic" },
+  { code: "GDA2020", name: "GDA2020 (Geocentric Datum of Australia 2020)", category: "Geographic" },
+  
+  // UTM Zones (North America)
+  { code: "UTM10N", name: "WGS 84 / UTM Zone 10N", category: "UTM North" },
+  { code: "UTM11N", name: "WGS 84 / UTM Zone 11N", category: "UTM North" },
+  { code: "UTM12N", name: "WGS 84 / UTM Zone 12N", category: "UTM North" },
+  { code: "UTM13N", name: "WGS 84 / UTM Zone 13N", category: "UTM North" },
+  { code: "UTM14N", name: "WGS 84 / UTM Zone 14N", category: "UTM North" },
+  { code: "UTM15N", name: "WGS 84 / UTM Zone 15N", category: "UTM North" },
+  { code: "UTM16N", name: "WGS 84 / UTM Zone 16N", category: "UTM North" },
+  { code: "UTM17N", name: "WGS 84 / UTM Zone 17N", category: "UTM North" },
+  { code: "UTM18N", name: "WGS 84 / UTM Zone 18N", category: "UTM North" },
+  { code: "UTM19N", name: "WGS 84 / UTM Zone 19N", category: "UTM North" },
+  
+  // UTM Zones (Europe)
+  { code: "UTM28N", name: "WGS 84 / UTM Zone 28N", category: "UTM North" },
+  { code: "UTM29N", name: "WGS 84 / UTM Zone 29N", category: "UTM North" },
+  { code: "UTM30N", name: "WGS 84 / UTM Zone 30N", category: "UTM North" },
+  { code: "UTM31N", name: "WGS 84 / UTM Zone 31N", category: "UTM North" },
+  { code: "UTM32N", name: "WGS 84 / UTM Zone 32N", category: "UTM North" },
+  { code: "UTM33N", name: "WGS 84 / UTM Zone 33N", category: "UTM North" },
+  { code: "UTM34N", name: "WGS 84 / UTM Zone 34N", category: "UTM North" },
+  { code: "UTM35N", name: "WGS 84 / UTM Zone 35N", category: "UTM North" },
+  { code: "UTM36N", name: "WGS 84 / UTM Zone 36N", category: "UTM North" },
+  { code: "UTM37N", name: "WGS 84 / UTM Zone 37N", category: "UTM North" },
+  { code: "UTM38N", name: "WGS 84 / UTM Zone 38N", category: "UTM North" },
+  
+  // UTM Zones (Southern Hemisphere)
+  { code: "UTM50S", name: "WGS 84 / UTM Zone 50S", category: "UTM South" },
+  { code: "UTM51S", name: "WGS 84 / UTM Zone 51S", category: "UTM South" },
+  { code: "UTM52S", name: "WGS 84 / UTM Zone 52S", category: "UTM South" },
+  { code: "UTM53S", name: "WGS 84 / UTM Zone 53S", category: "UTM South" },
+  { code: "UTM54S", name: "WGS 84 / UTM Zone 54S", category: "UTM South" },
+  { code: "UTM55S", name: "WGS 84 / UTM Zone 55S", category: "UTM South" },
+  { code: "UTM56S", name: "WGS 84 / UTM Zone 56S", category: "UTM South" },
+  
+  // State Plane Coordinate Systems (US)
+  { code: "SPCS_CA_I", name: "NAD83 / California Zone I", category: "State Plane" },
+  { code: "SPCS_CA_II", name: "NAD83 / California Zone II", category: "State Plane" },
+  { code: "SPCS_CA_III", name: "NAD83 / California Zone III", category: "State Plane" },
+  { code: "SPCS_CA_IV", name: "NAD83 / California Zone IV", category: "State Plane" },
+  { code: "SPCS_CA_V", name: "NAD83 / California Zone V", category: "State Plane" },
+  { code: "SPCS_CA_VI", name: "NAD83 / California Zone VI", category: "State Plane" },
+  { code: "SPCS_TX_N", name: "NAD83 / Texas North", category: "State Plane" },
+  { code: "SPCS_TX_NC", name: "NAD83 / Texas North Central", category: "State Plane" },
+  { code: "SPCS_TX_C", name: "NAD83 / Texas Central", category: "State Plane" },
+  { code: "SPCS_TX_SC", name: "NAD83 / Texas South Central", category: "State Plane" },
+  { code: "SPCS_TX_S", name: "NAD83 / Texas South", category: "State Plane" },
+  { code: "SPCS_FL_E", name: "NAD83 / Florida East", category: "State Plane" },
+  { code: "SPCS_FL_W", name: "NAD83 / Florida West", category: "State Plane" },
+  { code: "SPCS_FL_N", name: "NAD83 / Florida North", category: "State Plane" },
+  { code: "SPCS_NY_E", name: "NAD83 / New York East", category: "State Plane" },
+  { code: "SPCS_NY_C", name: "NAD83 / New York Central", category: "State Plane" },
+  { code: "SPCS_NY_W", name: "NAD83 / New York West", category: "State Plane" },
+  { code: "SPCS_NY_LI", name: "NAD83 / New York Long Island", category: "State Plane" },
+  
+  // British National Grid
+  { code: "OSGB36", name: "OSGB 1936 / British National Grid", category: "National Grid" },
+  
+  // Web Mercator
+  { code: "WEBMERCATOR", name: "WGS 84 / Pseudo-Mercator (Web Mercator)", category: "Web" },
+  
+  // Local / Custom
+  { code: "LOCAL", name: "Local Coordinate System", category: "Local" },
+];
+
 export default function AutodeskSettingsScreen() {
   const theme = useTheme();
   const params = useLocalSearchParams();
@@ -73,6 +153,8 @@ export default function AutodeskSettingsScreen() {
   
   // Advanced Settings
   const [coordinateSystem, setCoordinateSystem] = useState("WGS84");
+  const [showCoordinateSystemPicker, setShowCoordinateSystemPicker] = useState(false);
+  const [coordinateSystemSearch, setCoordinateSystemSearch] = useState("");
   const [useGCP, setUseGCP] = useState(false);
   const [gcpFile, setGcpFile] = useState("");
   
@@ -193,6 +275,31 @@ export default function AutodeskSettingsScreen() {
     setShowProjectPicker(false);
   };
 
+  const handleCoordinateSystemSelect = (system: CoordinateSystem) => {
+    setCoordinateSystem(system.code);
+    setShowCoordinateSystemPicker(false);
+    setCoordinateSystemSearch("");
+  };
+
+  const getFilteredCoordinateSystems = () => {
+    if (!coordinateSystemSearch.trim()) {
+      return COORDINATE_SYSTEMS;
+    }
+    
+    const search = coordinateSystemSearch.toLowerCase();
+    return COORDINATE_SYSTEMS.filter(
+      (sys) =>
+        sys.code.toLowerCase().includes(search) ||
+        sys.name.toLowerCase().includes(search) ||
+        sys.category.toLowerCase().includes(search)
+    );
+  };
+
+  const getSelectedCoordinateSystemName = () => {
+    const system = COORDINATE_SYSTEMS.find((sys) => sys.code === coordinateSystem);
+    return system ? system.name : coordinateSystem;
+  };
+
   const handleStartProcessing = async () => {
     if (!selectedProjectId) {
       Alert.alert("Error", "Please select a project");
@@ -295,6 +402,15 @@ export default function AutodeskSettingsScreen() {
         return { ios: "circle.fill", android: "circle" };
     }
   };
+
+  // Group coordinate systems by category
+  const groupedCoordinateSystems = getFilteredCoordinateSystems().reduce((acc, sys) => {
+    if (!acc[sys.category]) {
+      acc[sys.category] = [];
+    }
+    acc[sys.category].push(sys);
+    return acc;
+  }, {} as Record<string, CoordinateSystem[]>);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -605,15 +721,33 @@ export default function AutodeskSettingsScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Coordinate System</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="WGS84"
-              placeholderTextColor={colors.textSecondary}
-              value={coordinateSystem}
-              onChangeText={setCoordinateSystem}
-            />
+            <Pressable
+              style={styles.coordinateSystemSelector}
+              onPress={() => setShowCoordinateSystemPicker(true)}
+            >
+              <View style={styles.coordinateSystemContent}>
+                <IconSymbol
+                  ios_icon_name="globe"
+                  android_material_icon_name="public"
+                  size={20}
+                  color={colors.primary}
+                />
+                <View style={styles.coordinateSystemTextContainer}>
+                  <Text style={styles.coordinateSystemCode}>{coordinateSystem}</Text>
+                  <Text style={styles.coordinateSystemName} numberOfLines={1}>
+                    {getSelectedCoordinateSystemName()}
+                  </Text>
+                </View>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.down"
+                android_material_icon_name="arrow_drop_down"
+                size={24}
+                color={colors.textSecondary}
+              />
+            </Pressable>
             <Text style={styles.helpText}>
-              Default: WGS84 (GPS coordinates)
+              Select the coordinate reference system for your output
             </Text>
           </View>
 
@@ -709,6 +843,7 @@ export default function AutodeskSettingsScreen() {
             </View>
             {loadingProjects ? (
               <View style={styles.modalLoading}>
+                <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.modalLoadingText}>Loading projects...</Text>
               </View>
             ) : projects.length === 0 ? (
@@ -753,6 +888,96 @@ export default function AutodeskSettingsScreen() {
                 )}
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Coordinate System Picker Modal */}
+      <Modal
+        visible={showCoordinateSystemPicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          setShowCoordinateSystemPicker(false);
+          setCoordinateSystemSearch("");
+        }}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              setShowCoordinateSystemPicker(false);
+              setCoordinateSystemSearch("");
+            }}
+          />
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Coordinate System</Text>
+              <Pressable
+                onPress={() => {
+                  setShowCoordinateSystemPicker(false);
+                  setCoordinateSystemSearch("");
+                }}
+                style={styles.modalCloseButton}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark"
+                  android_material_icon_name="close"
+                  size={24}
+                  color={colors.textPrimary}
+                />
+              </Pressable>
+            </View>
+            
+            {/* Search Input */}
+            <View style={styles.searchContainer}>
+              <IconSymbol
+                ios_icon_name="magnifyingglass"
+                android_material_icon_name="search"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search coordinate systems..."
+                placeholderTextColor={colors.textSecondary}
+                value={coordinateSystemSearch}
+                onChangeText={setCoordinateSystemSearch}
+              />
+            </View>
+
+            <ScrollView style={styles.coordinateSystemList}>
+              {Object.entries(groupedCoordinateSystems).map(([category, systems]) => (
+                <View key={category} style={styles.categorySection}>
+                  <Text style={styles.categoryTitle}>{category}</Text>
+                  {systems.map((system) => (
+                    <Pressable
+                      key={system.code}
+                      style={[
+                        styles.coordinateSystemItem,
+                        coordinateSystem === system.code && styles.coordinateSystemItemSelected,
+                      ]}
+                      onPress={() => handleCoordinateSystemSelect(system)}
+                    >
+                      <View style={styles.coordinateSystemItemContent}>
+                        <Text style={styles.coordinateSystemItemCode}>{system.code}</Text>
+                        <Text style={styles.coordinateSystemItemName} numberOfLines={2}>
+                          {system.name}
+                        </Text>
+                      </View>
+                      {coordinateSystem === system.code && (
+                        <IconSymbol
+                          ios_icon_name="checkmark.circle.fill"
+                          android_material_icon_name="check_circle"
+                          size={24}
+                          color={colors.primary}
+                        />
+                      )}
+                    </Pressable>
+                  ))}
+                </View>
+              ))}
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -892,6 +1117,35 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.textPrimary,
   },
+  coordinateSystemSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  coordinateSystemContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  coordinateSystemTextContainer: {
+    flex: 1,
+  },
+  coordinateSystemCode: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  coordinateSystemName: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
   inputGroup: {
     marginBottom: 20,
   },
@@ -1030,6 +1284,7 @@ const styles = StyleSheet.create({
   modalLoadingText: {
     fontSize: 16,
     color: colors.textSecondary,
+    marginTop: 12,
   },
   modalEmpty: {
     padding: 40,
@@ -1068,5 +1323,60 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
+  coordinateSystemList: {
+    flex: 1,
+  },
+  categorySection: {
+    paddingVertical: 12,
+  },
+  categoryTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: colors.primary + "10",
+  },
+  coordinateSystemItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+  },
+  coordinateSystemItemSelected: {
+    backgroundColor: colors.primary + "10",
+  },
+  coordinateSystemItemContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  coordinateSystemItemCode: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 2,
+  },
+  coordinateSystemItemName: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
 });

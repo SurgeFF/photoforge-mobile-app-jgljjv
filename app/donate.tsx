@@ -22,37 +22,318 @@ import {
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
 
+export default function DonateScreen() {
+  const theme = useTheme();
+  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
+  const [customAmount, setCustomAmount] = useState("");
+  const [donationMessage, setDonationMessage] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const handleDonate = () => {
+    const amount = selectedAmount || parseFloat(customAmount);
+    
+    if (!amount || amount <= 0) {
+      Alert.alert("Invalid Amount", "Please select or enter a donation amount");
+      return;
+    }
+
+    if (amount < 1) {
+      Alert.alert("Minimum Amount", "Minimum donation amount is $1.00");
+      return;
+    }
+
+    setShowPaymentModal(true);
+  };
+
+  const handlePaymentSuccess = (result: any) => {
+    console.log("Payment successful:", result);
+    setShowPaymentModal(false);
+    
+    Alert.alert(
+      "Thank You! 🎉",
+      `Your donation of $${(selectedAmount || parseFloat(customAmount)).toFixed(2)} has been processed successfully!\n\nYour support helps us continue developing PhotoForge and providing the best drone photogrammetry tools.`,
+      [
+        {
+          text: "Done",
+          onPress: () => router.back(),
+        },
+      ]
+    );
+  };
+
+  const handlePaymentError = (error: string) => {
+    console.error("Payment error:", error);
+    setShowPaymentModal(false);
+    
+    Alert.alert(
+      "Payment Failed",
+      `We couldn't process your donation: ${error}\n\nPlease try again or contact support if the problem persists.`,
+      [{ text: "OK" }]
+    );
+  };
+
+  const handleCustomAmountChange = (text: string) => {
+    // Remove any non-numeric characters except decimal point
+    const cleaned = text.replace(/[^0-9.]/g, "");
+    
+    // Ensure only one decimal point
+    const parts = cleaned.split(".");
+    if (parts.length > 2) {
+      return;
+    }
+    
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      return;
+    }
+    
+    setCustomAmount(cleaned);
+    setSelectedAmount(null);
+  };
+
+  const finalAmount = selectedAmount || parseFloat(customAmount) || 0;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <TopographicBackground />
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow_back"
+            size={24}
+            color={colors.textPrimary}
+          />
+        </Pressable>
+        <Text style={styles.headerTitle}>Support PhotoForge</Text>
+        <View style={styles.placeholder} />
+      </View>
+
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.iconContainer}>
+          <IconSymbol
+            ios_icon_name="heart.fill"
+            android_material_icon_name="favorite"
+            size={64}
+            color={colors.error}
+          />
+        </View>
+
+        <Text style={styles.title}>Support PhotoForge</Text>
+        <Text style={styles.subtitle}>
+          Your donation helps us continue developing cutting-edge drone photogrammetry tools and maintaining our services.
+        </Text>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Select Amount</Text>
+          <View style={styles.presetAmounts}>
+            {PRESET_AMOUNTS.map((amount) => (
+              <Pressable
+                key={amount}
+                style={[
+                  styles.presetButton,
+                  selectedAmount === amount && styles.presetButtonActive,
+                ]}
+                onPress={() => {
+                  setSelectedAmount(amount);
+                  setCustomAmount("");
+                }}
+              >
+                <Text
+                  style={[
+                    styles.presetButtonText,
+                    selectedAmount === amount && styles.presetButtonTextActive,
+                  ]}
+                >
+                  ${amount}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.customAmountContainer}>
+            <Text style={styles.customAmountLabel}>Or enter custom amount</Text>
+            <TextInput
+              style={styles.customAmountInput}
+              placeholder="$0.00"
+              placeholderTextColor={colors.textSecondary}
+              value={customAmount}
+              onChangeText={handleCustomAmountChange}
+              keyboardType="decimal-pad"
+            />
+          </View>
+
+          <View style={styles.messageContainer}>
+            <Text style={styles.messageLabel}>Add a message (optional)</Text>
+            <TextInput
+              style={styles.messageInput}
+              placeholder="Leave a message with your donation..."
+              placeholderTextColor={colors.textSecondary}
+              value={donationMessage}
+              onChangeText={setDonationMessage}
+              multiline
+              maxLength={500}
+            />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.impactSection}>
+            <Text style={styles.impactTitle}>Your Impact</Text>
+            <View style={styles.impactItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={styles.impactText}>
+                Support ongoing development of new features
+              </Text>
+            </View>
+            <View style={styles.impactItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={styles.impactText}>
+                Help maintain and improve server infrastructure
+              </Text>
+            </View>
+            <View style={styles.impactItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={styles.impactText}>
+                Enable better customer support and documentation
+              </Text>
+            </View>
+            <View style={styles.impactItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={styles.impactText}>
+                Keep PhotoForge accessible to everyone
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <Button
+          onPress={handleDonate}
+          style={styles.donateButton}
+          disabled={finalAmount <= 0}
+        >
+          {finalAmount > 0 ? `Donate $${finalAmount.toFixed(2)}` : "Select Amount"}
+        </Button>
+      </ScrollView>
+
+      <Modal
+        visible={showPaymentModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Complete Donation</Text>
+              <Pressable
+                style={styles.closeButton}
+                onPress={() => setShowPaymentModal(false)}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            </View>
+
+            <ScrollView 
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <SquarePaymentForm
+                amount={finalAmount}
+                paymentType="donation"
+                message={donationMessage}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+              />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+    backgroundColor: colors.backgroundLight,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    paddingTop: Platform.OS === "android" ? 48 : 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+  },
+  backButton: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    flex: 1,
+    textAlign: "center",
+  },
+  placeholder: {
+    width: 40,
+  },
+  scrollView: {
     flex: 1,
   },
   scrollContent: {
     padding: 24,
     paddingBottom: 120,
   },
-  header: {
-    marginBottom: 32,
-  },
-  backButton: {
-    flexDirection: "row",
+  iconContainer: {
     alignItems: "center",
-    gap: 8,
     marginBottom: 16,
   },
-  backButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.primary,
-  },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "800",
     color: colors.textPrimary,
+    textAlign: "center",
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
     color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 32,
     lineHeight: 24,
   },
   section: {
@@ -75,7 +356,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: colors.accentBorder,
-    backgroundColor: colors.surface + "80",
+    backgroundColor: colors.surface + "CC",
   },
   presetButtonActive: {
     borderColor: colors.primary,
@@ -84,7 +365,7 @@ const styles = StyleSheet.create({
   presetButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: colors.textSecondary,
+    color: colors.textPrimary,
   },
   presetButtonTextActive: {
     color: colors.primary,
@@ -167,7 +448,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "90%",
     maxWidth: 500,
-    backgroundColor: colors.backgroundWarm,
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 24,
     maxHeight: "80%",
@@ -190,255 +471,3 @@ const styles = StyleSheet.create({
     maxHeight: 500,
   },
 });
-
-export default function DonateScreen() {
-  const theme = useTheme();
-  const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
-  const [customAmount, setCustomAmount] = useState("");
-  const [donationMessage, setDonationMessage] = useState("");
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-
-  const handleDonate = () => {
-    const amount = selectedAmount || parseFloat(customAmount);
-    
-    if (!amount || amount <= 0) {
-      Alert.alert("Invalid Amount", "Please select or enter a donation amount");
-      return;
-    }
-
-    if (amount < 1) {
-      Alert.alert("Minimum Amount", "Minimum donation amount is $1.00");
-      return;
-    }
-
-    setShowPaymentModal(true);
-  };
-
-  const handlePaymentSuccess = (result: any) => {
-    console.log("Payment successful:", result);
-    setShowPaymentModal(false);
-    
-    Alert.alert(
-      "Thank You! 🎉",
-      `Your donation of $${(selectedAmount || parseFloat(customAmount)).toFixed(2)} has been processed successfully!\n\nYour support helps us continue developing PhotoForge and providing the best drone photogrammetry tools.`,
-      [
-        {
-          text: "Done",
-          onPress: () => router.back(),
-        },
-      ]
-    );
-  };
-
-  const handlePaymentError = (error: string) => {
-    console.error("Payment error:", error);
-    setShowPaymentModal(false);
-    
-    Alert.alert(
-      "Payment Failed",
-      `We couldn't process your donation: ${error}\n\nPlease try again or contact support if the problem persists.`,
-      [{ text: "OK" }]
-    );
-  };
-
-  const handleCustomAmountChange = (text: string) => {
-    // Remove any non-numeric characters except decimal point
-    const cleaned = text.replace(/[^0-9.]/g, "");
-    
-    // Ensure only one decimal point
-    const parts = cleaned.split(".");
-    if (parts.length > 2) {
-      return;
-    }
-    
-    // Limit to 2 decimal places
-    if (parts[1] && parts[1].length > 2) {
-      return;
-    }
-    
-    setCustomAmount(cleaned);
-    setSelectedAmount(null);
-  };
-
-  const finalAmount = selectedAmount || parseFloat(customAmount) || 0;
-
-  return (
-    <View style={styles.container}>
-      <TopographicBackground />
-      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
-        <ScrollView 
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.header}>
-            <Pressable style={styles.backButton} onPress={() => router.back()}>
-              <IconSymbol
-                ios_icon_name="chevron.left"
-                android_material_icon_name="arrow-back"
-                size={24}
-                color={colors.primary}
-              />
-              <Text style={styles.backButtonText}>Back</Text>
-            </Pressable>
-            
-            <Text style={styles.title}>Support PhotoForge</Text>
-            <Text style={styles.subtitle}>
-              Your donation helps us continue developing cutting-edge drone photogrammetry tools and maintaining our services.
-            </Text>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Select Amount</Text>
-            <View style={styles.presetAmounts}>
-              {PRESET_AMOUNTS.map((amount) => (
-                <Pressable
-                  key={amount}
-                  style={[
-                    styles.presetButton,
-                    selectedAmount === amount && styles.presetButtonActive,
-                  ]}
-                  onPress={() => {
-                    setSelectedAmount(amount);
-                    setCustomAmount("");
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.presetButtonText,
-                      selectedAmount === amount && styles.presetButtonTextActive,
-                    ]}
-                  >
-                    ${amount}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <View style={styles.customAmountContainer}>
-              <Text style={styles.customAmountLabel}>Or enter custom amount</Text>
-              <TextInput
-                style={styles.customAmountInput}
-                placeholder="$0.00"
-                placeholderTextColor={colors.textSecondary}
-                value={customAmount}
-                onChangeText={handleCustomAmountChange}
-                keyboardType="decimal-pad"
-              />
-            </View>
-
-            <View style={styles.messageContainer}>
-              <Text style={styles.messageLabel}>Add a message (optional)</Text>
-              <TextInput
-                style={styles.messageInput}
-                placeholder="Leave a message with your donation..."
-                placeholderTextColor={colors.textSecondary}
-                value={donationMessage}
-                onChangeText={setDonationMessage}
-                multiline
-                maxLength={500}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.impactSection}>
-              <Text style={styles.impactTitle}>Your Impact</Text>
-              <View style={styles.impactItem}>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.impactText}>
-                  Support ongoing development of new features
-                </Text>
-              </View>
-              <View style={styles.impactItem}>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.impactText}>
-                  Help maintain and improve server infrastructure
-                </Text>
-              </View>
-              <View style={styles.impactItem}>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.impactText}>
-                  Enable better customer support and documentation
-                </Text>
-              </View>
-              <View style={styles.impactItem}>
-                <IconSymbol
-                  ios_icon_name="checkmark.circle.fill"
-                  android_material_icon_name="check-circle"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.impactText}>
-                  Keep PhotoForge accessible to everyone
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <Button
-            onPress={handleDonate}
-            style={styles.donateButton}
-            disabled={finalAmount <= 0}
-          >
-            {finalAmount > 0 ? `Donate $${finalAmount.toFixed(2)}` : "Select Amount"}
-          </Button>
-        </ScrollView>
-      </SafeAreaView>
-
-      <Modal
-        visible={showPaymentModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPaymentModal(false)}
-      >
-        <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Complete Donation</Text>
-              <Pressable
-                style={styles.closeButton}
-                onPress={() => setShowPaymentModal(false)}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </Pressable>
-            </View>
-
-            <ScrollView 
-              style={styles.modalScroll}
-              showsVerticalScrollIndicator={false}
-            >
-              <SquarePaymentForm
-                amount={finalAmount}
-                paymentType="donation"
-                message={donationMessage}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
-              />
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    </View>
-  );
-}

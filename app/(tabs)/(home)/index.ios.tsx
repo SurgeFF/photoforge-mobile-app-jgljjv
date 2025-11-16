@@ -10,6 +10,7 @@ import {
   Alert,
   Pressable,
   Linking,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -306,11 +307,10 @@ export default function HomeScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.logoContainer}>
-            <IconSymbol
-              ios_icon_name="camera.fill"
-              android_material_icon_name="camera"
-              size={80}
-              color={colors.primary}
+            <Image
+              source={require('@/assets/images/e179f277-739f-4333-be1a-52fe84f4ba16.png')}
+              style={styles.logoImage}
+              resizeMode="contain"
             />
             <Text style={styles.appTitle}>PhotoForge</Text>
             <Text style={styles.appSubtitle}>Drone Mapping & 3D Processing</Text>
@@ -602,6 +602,11 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: "center",
     marginBottom: 48,
+  },
+  logoImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 24,
   },
   appTitle: {
     fontSize: 36,

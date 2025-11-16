@@ -11,9 +11,9 @@ import {
   Pressable,
   ActivityIndicator,
   Switch,
-  Slider,
   Modal,
 } from "react-native";
+import Slider from "@react-native-community/slider";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
 import { router, useLocalSearchParams } from "expo-router";

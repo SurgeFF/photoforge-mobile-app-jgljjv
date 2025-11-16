@@ -196,7 +196,7 @@ export default function SupportScreen() {
             />
             <View style={styles.contactInfo}>
               <Text style={styles.contactLabel}>Email</Text>
-              <Text style={styles.contactValue}>support@photoforge.com</Text>
+              <Text style={styles.contactValue}>drone1337llc@gmail.com</Text>
             </View>
           </View>
           <View style={styles.contactCard}>
