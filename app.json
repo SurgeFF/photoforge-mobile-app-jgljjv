@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PhotoForge Mobile",
-    "slug": "PhotoForge Mobile",
+    "name": "photoforge-mobile-app-jgljjv",
+    "slug": "photoforge-mobile-app-jgljjv",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -26,7 +26,7 @@
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively",
+      "package": "com.droneelite.photoforgemobile",
       "googleServicesFile": "./google-services.json"
     },
     "web": {

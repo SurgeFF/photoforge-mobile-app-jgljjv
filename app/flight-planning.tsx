@@ -25,8 +25,8 @@ import { generateFlightPlanMobile, djiUploadFlightPlan, getAccessKey } from "@/u
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Hardcoded Google Maps API Key
-const GOOGLE_MAPS_API_KEY = "AIzaSyDCSfZQiUsIAIN73YIyK6EOpaIuMtnD4aE";
+// Securely load Google Maps API Key from environment variables
+const GOOGLE_MAPS_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || "";
 
 interface FlightPlanStatistics {
   total_waypoints: number;
@@ -62,7 +62,7 @@ export default function FlightPlanningScreen() {
   const [globalSpeed, setGlobalSpeed] = useState("10");
   const [gimbalPitch, setGimbalPitch] = useState("-90");
   
-  // NEW: Finish Action and RC Signal Lost Settings
+  // Finish Action and RC Signal Lost Settings
   const [finishAction, setFinishAction] = useState("gohome");
   const [exitOnRCLost, setExitOnRCLost] = useState(true);
   const [showFinishActionModal, setShowFinishActionModal] = useState(false);
@@ -149,6 +149,13 @@ export default function FlightPlanningScreen() {
     },
   };
 
+  // Check if API key is configured
+  useEffect(() => {
+    if (!GOOGLE_MAPS_API_KEY) {
+      console.warn("⚠️ Google Maps API key is not configured. Please add EXPO_PUBLIC_GOOGLE_MAPS_API_KEY to your .env file");
+    }
+  }, []);
+
   const handleDroneChange = (droneKey: string) => {
     setDroneModel(droneKey);
     const preset = dronePresets[droneKey];
@@ -162,6 +169,11 @@ export default function FlightPlanningScreen() {
   const handleAddressSearch = async () => {
     if (!searchAddress.trim()) {
       Alert.alert("Error", "Please enter an address");
+      return;
+    }
+
+    if (!GOOGLE_MAPS_API_KEY) {
+      Alert.alert("Configuration Error", "Google Maps API key is not configured. Please contact the app administrator.");
       return;
     }
 
@@ -431,6 +443,40 @@ export default function FlightPlanningScreen() {
   };
 
   const getMapHTML = () => {
+    if (!GOOGLE_MAPS_API_KEY) {
+      return `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            body { 
+              margin: 0; 
+              padding: 20px; 
+              display: flex; 
+              align-items: center; 
+              justify-content: center; 
+              height: 100vh; 
+              background: #f5f5f5;
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            .error {
+              text-align: center;
+              color: #d32f2f;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="error">
+            <h3>⚠️ Configuration Error</h3>
+            <p>Google Maps API key is not configured.</p>
+            <p>Please add EXPO_PUBLIC_GOOGLE_MAPS_API_KEY to your .env file.</p>
+          </div>
+        </body>
+        </html>
+      `;
+    }
+
     return `
       <!DOCTYPE html>
       <html>
@@ -820,7 +866,7 @@ export default function FlightPlanningScreen() {
               </Text>
             </View>
 
-            {/* NEW: Finish Action Setting */}
+            {/* Finish Action Setting */}
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Finish Action</Text>
               <Pressable
@@ -840,7 +886,7 @@ export default function FlightPlanningScreen() {
               </Text>
             </View>
 
-            {/* NEW: Exit on RC Signal Lost Setting */}
+            {/* Exit on RC Signal Lost Setting */}
             <View style={styles.switchRow}>
               <View style={styles.switchLabel}>
                 <Text style={styles.label}>Exit Mission on RC Signal Lost</Text>
@@ -870,7 +916,7 @@ export default function FlightPlanningScreen() {
               />
             </View>
 
-            {/* NEW: Terrain Following Parameters */}
+            {/* Terrain Following Parameters */}
             {enableTerrainFollowing && (
               <View style={styles.terrainSettingsContainer}>
                 <View style={styles.inputGroup}>
