@@ -20,6 +20,7 @@ import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
 import SquarePaymentForm from "@/components/SquarePaymentForm";
 import { checkSubscription, getAccessKey } from "@/utils/apiClient";
+import { onNotification, refreshNotifications } from "@/utils/notificationService";
 
 const SUBSCRIPTION_AMOUNT = 5; // $5 per month
 
@@ -29,9 +30,26 @@ export default function SubscriptionScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [userEmail, setUserEmail] = useState("");
+  const [hasNewNotification, setHasNewNotification] = useState(false);
 
   useEffect(() => {
     loadSubscription();
+    
+    // Listen for payment notifications
+    const unsubscribe = onNotification((notification) => {
+      console.log("📬 Received notification in subscription screen:", notification.type);
+      
+      if (notification.type === "subscription_renewed" || 
+          notification.type === "subscription_cancelled" ||
+          notification.type === "payment_success") {
+        setHasNewNotification(true);
+        loadSubscription();
+      }
+    });
+    
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const loadSubscription = async () => {
@@ -46,6 +64,7 @@ export default function SubscriptionScreen() {
       const result = await checkSubscription(accessKey);
       if (result.success && result.data) {
         setSubscription(result.data);
+        setHasNewNotification(false);
       } else {
         Alert.alert("Error", result.error || "Failed to load subscription");
       }
@@ -54,6 +73,15 @@ export default function SubscriptionScreen() {
       Alert.alert("Error", "Failed to load subscription");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsLoading(true);
+    const accessKey = await getAccessKey();
+    if (accessKey) {
+      await refreshNotifications(accessKey);
+      await loadSubscription();
     }
   };
 
@@ -79,7 +107,7 @@ export default function SubscriptionScreen() {
     setShowPaymentForm(false);
     Alert.alert(
       "Subscription Activated!",
-      `Your $${SUBSCRIPTION_AMOUNT}/month subscription has been activated successfully.\n\nYou now have access to all premium features.`,
+      `Your $${SUBSCRIPTION_AMOUNT}/month subscription has been activated successfully.\n\nYou now have access to all premium features.\n\nYou will receive a confirmation notification shortly.`,
       [
         {
           text: "OK",
@@ -114,19 +142,41 @@ export default function SubscriptionScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
+            android_material_icon_name="arrow_back"
             size={24}
             color={colors.textPrimary}
           />
         </Pressable>
         <Text style={styles.headerTitle}>Subscription</Text>
-        <View style={styles.placeholder} />
+        <Pressable onPress={handleRefresh} style={styles.refreshButton}>
+          {hasNewNotification && <View style={styles.notificationDot} />}
+          <IconSymbol
+            ios_icon_name="arrow.clockwise"
+            android_material_icon_name="refresh"
+            size={24}
+            color={colors.textPrimary}
+          />
+        </Pressable>
       </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
       >
+        {hasNewNotification && (
+          <View style={styles.notificationBanner}>
+            <IconSymbol
+              ios_icon_name="bell.badge.fill"
+              android_material_icon_name="notifications_active"
+              size={24}
+              color={colors.primary}
+            />
+            <Text style={styles.notificationText}>
+              Your subscription status has been updated
+            </Text>
+          </View>
+        )}
+
         {subscription && (
           <React.Fragment>
             <View style={styles.statusCard}>
@@ -170,7 +220,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.featureItem}>
                   <IconSymbol
                     ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
+                    android_material_icon_name="check_circle"
                     size={24}
                     color={colors.success}
                   />
@@ -179,7 +229,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.featureItem}>
                   <IconSymbol
                     ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
+                    android_material_icon_name="check_circle"
                     size={24}
                     color={colors.success}
                   />
@@ -188,7 +238,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.featureItem}>
                   <IconSymbol
                     ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
+                    android_material_icon_name="check_circle"
                     size={24}
                     color={colors.success}
                   />
@@ -197,7 +247,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.featureItem}>
                   <IconSymbol
                     ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
+                    android_material_icon_name="check_circle"
                     size={24}
                     color={colors.success}
                   />
@@ -206,7 +256,7 @@ export default function SubscriptionScreen() {
                 <View style={styles.featureItem}>
                   <IconSymbol
                     ios_icon_name="checkmark.circle.fill"
-                    android_material_icon_name="check-circle"
+                    android_material_icon_name="check_circle"
                     size={24}
                     color={colors.success}
                   />
@@ -247,7 +297,7 @@ export default function SubscriptionScreen() {
             color={colors.primary}
           />
           <Text style={styles.infoText}>
-            Subscription payments are processed securely through Square. You can cancel anytime from your account settings.
+            Subscription payments are processed securely through Square. You can cancel anytime from your account settings. You will receive notifications when your subscription is renewed or if there are any payment issues.
           </Text>
         </View>
       </ScrollView>
@@ -266,7 +316,7 @@ export default function SubscriptionScreen() {
             >
               <IconSymbol
                 ios_icon_name="chevron.left"
-                android_material_icon_name="arrow-back"
+                android_material_icon_name="arrow_back"
                 size={24}
                 color={colors.textPrimary}
               />
@@ -328,6 +378,22 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
   },
+  refreshButton: {
+    padding: 8,
+    position: "relative",
+  },
+  notificationDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.error,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    zIndex: 1,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: "700",
@@ -354,6 +420,23 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     paddingBottom: 120,
+  },
+  notificationBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    marginBottom: 16,
+    gap: 12,
+  },
+  notificationText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.primary,
   },
   statusCard: {
     backgroundColor: colors.surface + "CC",

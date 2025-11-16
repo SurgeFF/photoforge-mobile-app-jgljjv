@@ -10,14 +10,25 @@ import {
   Alert,
   Platform,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import Button from "@/components/button";
+import { router } from "expo-router";
 import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
-import { router } from "expo-router";
 import TopographicBackground from "@/components/TopographicBackground";
+import Button from "@/components/button";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { validateAccessKey, getProjectsMobile } from "@/utils/apiClient";
+import { startNotificationPolling, stopNotificationPolling, onNotification } from "@/utils/notificationService";
+
+interface FeatureCardProps {
+  icon: string;
+  androidIcon: string;
+  title: string;
+  description: string;
+  onPress: () => void;
+  color: string;
+}
 
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
 
@@ -25,10 +36,8 @@ export default function HomeScreen() {
   const theme = useTheme();
   const [accessKey, setAccessKey] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isValidating, setIsValidating] = useState(false);
-  const [error, setError] = useState("");
-  const [userName, setUserName] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [projectCount, setProjectCount] = useState(0);
 
   useEffect(() => {
@@ -38,91 +47,84 @@ export default function HomeScreen() {
   useEffect(() => {
     if (isAuthenticated && accessKey) {
       loadProjects();
+      
+      // Start polling for payment notifications
+      startNotificationPolling(accessKey);
+      
+      // Register notification callback
+      const unsubscribe = onNotification((notification) => {
+        console.log("📬 Received notification in home screen:", notification.type);
+        
+        // Reload projects if subscription status changed
+        if (notification.type === "subscription_renewed" || notification.type === "subscription_cancelled") {
+          loadProjects();
+        }
+      });
+      
+      // Cleanup on unmount
+      return () => {
+        unsubscribe();
+        stopNotificationPolling();
+      };
     }
   }, [isAuthenticated, accessKey]);
 
   const loadProjects = async () => {
     try {
-      console.log("📂 Loading projects count...");
       const result = await getProjectsMobile(accessKey);
       if (result.success && result.data) {
         setProjectCount(result.data.length);
-        console.log("✅ Project count:", result.data.length);
       }
     } catch (error) {
-      console.error("[HomeScreen] Error loading projects:", error);
+      console.error("Error loading projects:", error);
     }
   };
 
   const checkStoredAccessKey = async () => {
     try {
       const storedKey = await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
-      const storedUser = await AsyncStorage.getItem("@photoforge_user_name");
-      
-      console.log("[HomeScreen] Checking stored access key...");
       if (storedKey) {
-        console.log("[HomeScreen] Found stored access key, length:", storedKey.length);
-        setAccessKey(storedKey);
-        setIsAuthenticated(true);
-        if (storedUser) {
-          setUserName(storedUser);
+        console.log("🔑 Found stored access key, validating...");
+        const result = await validateAccessKey(storedKey);
+        if (result.success) {
+          setAccessKey(storedKey);
+          setIsAuthenticated(true);
+          console.log("✅ Auto-login successful");
+        } else {
+          console.log("❌ Stored key invalid, clearing...");
+          await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
         }
-      } else {
-        console.log("[HomeScreen] No stored access key found");
       }
     } catch (error) {
-      console.error("[HomeScreen] Error loading access key:", error);
+      console.error("Error checking stored key:", error);
     } finally {
-      setIsLoading(false);
+      setIsCheckingAuth(false);
     }
   };
 
   const handleLogin = async () => {
     if (!accessKey.trim()) {
-      setError("Please enter your access key");
+      Alert.alert("Error", "Please enter your access key");
       return;
     }
 
-    setIsValidating(true);
-    setError("");
+    setIsLoading(true);
 
     try {
-      const result = await validateAccessKey(accessKey.trim());
+      const result = await validateAccessKey(accessKey);
 
-      if (result.success && result.data) {
-        console.log("[HomeScreen] ✅ Login successful");
-        await AsyncStorage.setItem(ACCESS_KEY_STORAGE, accessKey.trim());
-        await AsyncStorage.setItem("@photoforge_user_name", result.data.full_name || result.data.email);
+      if (result.success) {
+        await AsyncStorage.setItem(ACCESS_KEY_STORAGE, accessKey);
         setIsAuthenticated(true);
-        setUserName(result.data.full_name || result.data.email);
+        Alert.alert("Success", "Logged in successfully!");
       } else {
-        const errorMsg = result.error || "Invalid access key. Please check and try again.";
-        console.log("[HomeScreen] ❌ Login failed:", errorMsg);
-        setError(errorMsg);
-        
-        if (__DEV__) {
-          Alert.alert(
-            "Validation Failed",
-            `Error: ${errorMsg}\n\nCheck console for detailed logs.`,
-            [{ text: "OK" }]
-          );
-        }
+        Alert.alert("Error", result.error || "Invalid access key");
       }
     } catch (error) {
-      console.error("[HomeScreen] ❌ Exception during login:", error);
-      
-      const errorMessage = error instanceof Error ? error.message : "Unknown error";
-      setError(`Unable to validate: ${errorMessage}`);
-      
-      if (__DEV__) {
-        Alert.alert(
-          "Network Error",
-          `Error: ${errorMessage}\n\nMake sure you have internet connection and the server is accessible.\n\nCheck console for detailed logs.`,
-          [{ text: "OK" }]
-        );
-      }
+      console.error("Login error:", error);
+      Alert.alert("Error", "Failed to login. Please try again.");
     } finally {
-      setIsValidating(false);
+      setIsLoading(false);
     }
   };
 
@@ -136,14 +138,11 @@ export default function HomeScreen() {
           text: "Logout",
           style: "destructive",
           onPress: async () => {
-            console.log("[HomeScreen] Logging out...");
             await AsyncStorage.removeItem(ACCESS_KEY_STORAGE);
-            await AsyncStorage.removeItem("@photoforge_user_name");
-            setIsAuthenticated(false);
+            stopNotificationPolling();
             setAccessKey("");
-            setUserName("");
+            setIsAuthenticated(false);
             setProjectCount(0);
-            console.log("[HomeScreen] Logged out successfully");
           },
         },
       ]
@@ -151,290 +150,225 @@ export default function HomeScreen() {
   };
 
   const handleFlightPlanning = () => {
-    console.log("[HomeScreen] 🛫 Navigating to Flight Planning...");
-    try {
-      router.push({
-        pathname: "/flight-planning",
-        params: {
-          projectId: "new",
-          projectName: "New Flight Plan",
-        },
-      });
-      console.log("[HomeScreen] ✅ Navigation initiated");
-    } catch (error) {
-      console.error("[HomeScreen] ❌ Navigation error:", error);
-      Alert.alert("Error", "Failed to open Flight Planning. Please try again.");
+    if (projectCount === 0) {
+      Alert.alert(
+        "No Projects",
+        "You need to create a project first before planning a flight.",
+        [
+          {
+            text: "Create Project",
+            onPress: () => router.push("/new-project"),
+          },
+          { text: "Cancel", style: "cancel" },
+        ]
+      );
+    } else {
+      router.push("/projects");
     }
   };
 
-  if (isLoading) {
+  if (isCheckingAuth) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.backgroundLight }]}>
+      <SafeAreaView style={styles.container}>
         <TopographicBackground />
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   if (!isAuthenticated) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <TopographicBackground />
         <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={styles.loginContent}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.loginContainer}>
-            <View style={styles.logoContainer}>
-              <View style={styles.iconWrapper}>
-                <IconSymbol
-                  ios_icon_name="map.fill"
-                  android_material_icon_name="map"
-                  size={64}
-                  color={colors.surface}
-                />
-              </View>
-              <Text style={styles.title}>PhotoForge</Text>
-              <Text style={styles.subtitle}>Drone Mapping & Photogrammetry</Text>
-            </View>
+          <View style={styles.logoContainer}>
+            <IconSymbol
+              ios_icon_name="camera.fill"
+              android_material_icon_name="camera"
+              size={80}
+              color={colors.primary}
+            />
+            <Text style={styles.appTitle}>PhotoForge</Text>
+            <Text style={styles.appSubtitle}>Drone Mapping & 3D Processing</Text>
+          </View>
 
-            <View style={styles.formContainer}>
-              <Text style={styles.label}>Access Key</Text>
+          <View style={styles.loginCard}>
+            <Text style={styles.loginTitle}>Welcome Back</Text>
+            <Text style={styles.loginSubtitle}>
+              Enter your access key from PhotoForge.base44.app
+            </Text>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Access Key</Text>
               <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: error ? colors.error : colors.accentBorder,
-                  },
-                ]}
+                style={styles.input}
                 placeholder="Enter your access key"
                 placeholderTextColor={colors.textSecondary}
                 value={accessKey}
-                onChangeText={(text) => {
-                  setAccessKey(text);
-                  setError("");
-                }}
+                onChangeText={setAccessKey}
                 autoCapitalize="none"
                 autoCorrect={false}
                 secureTextEntry
               />
-              {error ? (
-                <View style={styles.errorContainer}>
-                  <IconSymbol
-                    ios_icon_name="exclamationmark.triangle.fill"
-                    android_material_icon_name="error"
-                    size={16}
-                    color={colors.error}
-                  />
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
+            </View>
 
-              <Button
-                onPress={handleLogin}
-                loading={isValidating}
-                disabled={isValidating}
-                style={styles.loginButton}
-              >
-                {isValidating ? "Validating..." : "Login"}
-              </Button>
+            <Button
+              onPress={handleLogin}
+              loading={isLoading}
+              disabled={isLoading}
+              style={styles.loginButton}
+            >
+              Login
+            </Button>
 
-              <View style={styles.infoContainer}>
-                <IconSymbol
-                  ios_icon_name="info.circle.fill"
-                  android_material_icon_name="info"
-                  size={20}
-                  color={colors.primary}
-                />
-                <Text style={styles.infoText}>
-                  Get your access key from PhotoForge.base44.app
-                </Text>
-              </View>
-              
-              {__DEV__ && (
-                <View style={styles.debugContainer}>
-                  <Text style={styles.debugText}>
-                    🔍 Debug Mode Active
-                  </Text>
-                  <Text style={styles.debugSubtext}>
-                    Check console logs for detailed validation information
-                  </Text>
-                </View>
-              )}
+            <View style={styles.helpBox}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={styles.helpText}>
+                Don&apos;t have an access key? Visit PhotoForge.base44.app to generate one.
+              </Text>
             </View>
           </View>
         </ScrollView>
-      </View>
+      </SafeAreaView>
     );
   }
 
-  // Main authenticated view - Dashboard
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <TopographicBackground />
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.greeting}>Welcome to</Text>
+            <Text style={styles.appName}>PhotoForge</Text>
+          </View>
+          <Button
+            onPress={handleLogout}
+            variant="outline"
+            style={styles.logoutButton}
+          >
+            Logout
+          </Button>
+        </View>
+      </View>
+
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={styles.mainContent}
+        contentContainerStyle={styles.content}
       >
-        <View style={styles.header}>
-          <Text style={styles.welcomeTitle}>PhotoForge</Text>
-          <Text style={styles.welcomeSubtitle}>
-            {userName ? `Welcome back, ${userName}` : "Drone Mapping Dashboard"}
-          </Text>
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
+        <View style={styles.statsCard}>
+          <View style={styles.statItem}>
             <IconSymbol
               ios_icon_name="folder.fill"
               android_material_icon_name="folder"
-              size={28}
+              size={32}
               color={colors.primary}
             />
-            <Text style={styles.statNumber}>{projectCount}</Text>
+            <Text style={styles.statValue}>{projectCount}</Text>
             <Text style={styles.statLabel}>Projects</Text>
-          </View>
-          <View style={styles.statCard}>
-            <IconSymbol
-              ios_icon_name="photo.stack.fill"
-              android_material_icon_name="collections"
-              size={28}
-              color={colors.primaryDark}
-            />
-            <Text style={styles.statNumber}>-</Text>
-            <Text style={styles.statLabel}>Images</Text>
-          </View>
-          <View style={styles.statCard}>
-            <IconSymbol
-              ios_icon_name="cube.fill"
-              android_material_icon_name="view_in_ar"
-              size={28}
-              color={colors.primary}
-            />
-            <Text style={styles.statNumber}>-</Text>
-            <Text style={styles.statLabel}>Models</Text>
           </View>
         </View>
 
-        {/* Main Features */}
-        <View style={styles.featuresContainer}>
-          <Text style={styles.sectionTitle}>Project Management</Text>
-          
+        <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+        <View style={styles.featuresGrid}>
           <FeatureCard
             icon="folder.badge.plus"
             androidIcon="create_new_folder"
-            title="Create Project"
-            description="Start a new mapping project"
+            title="New Project"
+            description="Create a new mapping project"
             onPress={() => router.push("/new-project")}
             color={colors.primary}
           />
 
           <FeatureCard
             icon="folder.fill"
-            androidIcon="folder_open"
+            androidIcon="folder"
             title="My Projects"
             description="View and manage your projects"
             onPress={() => router.push("/projects")}
             color={colors.primaryDark}
           />
 
-          <Text style={styles.sectionTitle}>Drone Operations</Text>
-
           <FeatureCard
-            icon="airplane"
-            androidIcon="flight"
+            icon="map.fill"
+            androidIcon="map"
             title="Flight Planning"
             description="Plan autonomous drone missions"
             onPress={handleFlightPlanning}
-            color={colors.primary}
+            color={colors.accent}
           />
 
           <FeatureCard
             icon="antenna.radiowaves.left.and.right"
             androidIcon="settings_remote"
             title="Drone Control"
-            description="Connect and control your DJI drone"
+            description="Connect and control your drone"
             onPress={() => router.push("/drone-control")}
-            color={colors.primaryDark}
+            color={colors.success}
           />
 
-          <Text style={styles.sectionTitle}>Processing & Analysis</Text>
-
           <FeatureCard
-            icon="cube.transparent"
+            icon="cube.fill"
             androidIcon="view_in_ar"
             title="3D Processing"
-            description="Configure Autodesk 3D processing settings"
+            description="Process images into 3D models"
             onPress={() => router.push("/autodesk-settings")}
-            color={colors.primary}
+            color={colors.warning}
           />
-
-          <FeatureCard
-            icon="photo.stack"
-            androidIcon="collections"
-            title="Media Gallery"
-            description="View project images and models"
-            onPress={() => router.push("/gallery")}
-            color={colors.primaryDark}
-          />
-
-          <Text style={styles.sectionTitle}>Account & Settings</Text>
 
           <FeatureCard
             icon="creditcard.fill"
             androidIcon="payment"
             title="Subscription"
-            description="Manage your subscription plan"
+            description="Manage your subscription"
             onPress={() => router.push("/subscription")}
-            color={colors.primary}
+            color={colors.primaryDark}
           />
 
           <FeatureCard
             icon="heart.fill"
             androidIcon="favorite"
-            title="Donate"
-            description="Support PhotoForge development"
+            title="Support Us"
+            description="Make a donation"
             onPress={() => router.push("/donate")}
-            color={colors.primaryDark}
+            color={colors.error}
           />
 
           <FeatureCard
-            icon="headphones"
-            androidIcon="headset_mic"
+            icon="questionmark.circle.fill"
+            androidIcon="help"
             title="Support"
             description="Get help and submit tickets"
             onPress={() => router.push("/support")}
-            color={colors.primary}
+            color={colors.textSecondary}
           />
         </View>
-
-        <Button
-          onPress={handleLogout}
-          variant="outline"
-          style={styles.logoutButton}
-        >
-          Logout
-        </Button>
       </ScrollView>
-    </View>
+    </SafeAreaView>
   );
-}
-
-interface FeatureCardProps {
-  icon: string;
-  androidIcon: string;
-  title: string;
-  description: string;
-  onPress: () => void;
-  color: string;
 }
 
 function FeatureCard({ icon, androidIcon, title, description, onPress, color }: FeatureCardProps) {
   return (
-    <Button onPress={onPress} style={[styles.featureCard, { borderLeftColor: color, borderLeftWidth: 4 }]}>
+    <Button
+      onPress={onPress}
+      variant="outline"
+      style={styles.featureCard}
+    >
       <View style={styles.featureContent}>
-        <View style={[styles.iconContainer, { backgroundColor: color + "20" }]}>
+        <View style={[styles.featureIconContainer, { backgroundColor: color + "20" }]}>
           <IconSymbol
             ios_icon_name={icon}
             android_material_icon_name={androidIcon}
@@ -442,18 +376,8 @@ function FeatureCard({ icon, androidIcon, title, description, onPress, color }: 
             color={color}
           />
         </View>
-        <View style={styles.featureTextContainer}>
-          <Text style={styles.featureTitle}>{title}</Text>
-          <Text style={styles.featureDescription}>
-            {description}
-          </Text>
-        </View>
-        <IconSymbol
-          ios_icon_name="chevron.right"
-          android_material_icon_name="chevron_right"
-          size={24}
-          color={colors.textSecondary}
-        />
+        <Text style={styles.featureTitle}>{title}</Text>
+        <Text style={styles.featureDescription}>{description}</Text>
       </View>
     </Button>
   );
@@ -464,170 +388,145 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.backgroundLight,
   },
-  scrollView: {
+  loadingContainer: {
     flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "android" ? 48 : 0,
-    paddingBottom: 120,
+    alignItems: "center",
   },
-  mainContent: {
-    paddingTop: Platform.OS === "android" ? 48 : 24,
-    paddingHorizontal: 24,
-    paddingBottom: 120,
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.textSecondary,
   },
-  loginContainer: {
-    width: "100%",
-    maxWidth: 400,
-    alignSelf: "center",
+  loginContent: {
+    flexGrow: 1,
+    padding: 24,
+    justifyContent: "center",
   },
   logoContainer: {
     alignItems: "center",
     marginBottom: 48,
   },
-  iconWrapper: {
-    width: 96,
-    height: 96,
-    borderRadius: 24,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: colors.textPrimary,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-      },
-      android: {
-        elevation: 12,
-      },
-      web: {
-        boxShadow: '0px 8px 24px rgba(61, 47, 32, 0.3)',
-      },
-    }),
-  },
-  title: {
+  appTitle: {
     fontSize: 36,
     fontWeight: "800",
     color: colors.textPrimary,
-    marginTop: 8,
+    marginTop: 16,
   },
-  subtitle: {
+  appSubtitle: {
     fontSize: 16,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 8,
   },
-  formContainer: {
-    width: "100%",
+  loginCard: {
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 20,
+    padding: 24,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
   },
-  label: {
-    fontSize: 16,
+  loginTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  loginSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
     fontWeight: "600",
     color: colors.textPrimary,
     marginBottom: 8,
   },
   input: {
-    height: 56,
+    height: 48,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
     borderWidth: 1,
-    backgroundColor: colors.surface + 'CC',
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface,
     color: colors.textPrimary,
-  },
-  errorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 8,
-    gap: 8,
-  },
-  errorText: {
-    color: colors.error,
-    fontSize: 14,
-    flex: 1,
   },
   loginButton: {
-    marginTop: 24,
-    height: 56,
+    marginBottom: 16,
   },
-  infoContainer: {
+  helpBox: {
     flexDirection: "row",
-    alignItems: "center",
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: colors.surface + 'CC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
+    alignItems: "flex-start",
+    padding: 12,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 8,
+    gap: 8,
   },
-  infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginLeft: 12,
+  helpText: {
     flex: 1,
-  },
-  debugContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: colors.warning + "20",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.warning,
-  },
-  debugText: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.warning,
-    marginBottom: 4,
-  },
-  debugSubtext: {
     fontSize: 12,
-    color: colors.warning,
+    color: colors.textSecondary,
+    lineHeight: 18,
   },
   header: {
-    alignItems: "center",
-    marginBottom: 24,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "android" ? 48 : 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
   },
-  welcomeTitle: {
-    fontSize: 32,
-    fontWeight: "800",
-    color: colors.textPrimary,
-    textAlign: "center",
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: "center",
-  },
-  statsContainer: {
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 32,
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.surface + 'CC',
-    borderRadius: 16,
-    padding: 16,
     alignItems: "center",
+  },
+  greeting: {
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  appName: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.textPrimary,
+  },
+  logoutButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 24,
+    paddingBottom: 120,
+  },
+  statsCard: {
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
     borderWidth: 1,
     borderColor: colors.accentBorder,
+    flexDirection: "row",
+    justifyContent: "space-around",
   },
-  statNumber: {
-    fontSize: 28,
+  statItem: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 32,
     fontWeight: "800",
     color: colors.textPrimary,
     marginTop: 8,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textSecondary,
     marginTop: 4,
   },
@@ -635,48 +534,43 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     color: colors.textPrimary,
-    marginTop: 16,
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  featuresContainer: {
-    gap: 12,
+  featuresGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
   },
   featureCard: {
-    backgroundColor: colors.surface + 'CC',
-    borderRadius: 16,
+    width: "48%",
+    aspectRatio: 1,
     padding: 0,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    marginBottom: 0,
   },
   featureContent: {
-    flexDirection: "row",
-    alignItems: "center",
+    flex: 1,
     padding: 16,
-  },
-  iconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 16,
   },
-  featureTextContainer: {
-    flex: 1,
+  featureIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
   },
   featureTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: "700",
-    marginBottom: 4,
     color: colors.textPrimary,
+    textAlign: "center",
+    marginBottom: 4,
   },
   featureDescription: {
-    fontSize: 14,
+    fontSize: 12,
     color: colors.textSecondary,
-  },
-  logoutButton: {
-    marginTop: 32,
-    height: 48,
+    textAlign: "center",
+    lineHeight: 16,
   },
 });

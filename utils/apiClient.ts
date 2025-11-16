@@ -122,6 +122,17 @@ export interface ProcessingStatus {
   error?: string;
 }
 
+export interface PaymentNotification {
+  type: "payment_success" | "payment_failed" | "subscription_renewed" | "subscription_cancelled";
+  payment_id?: string;
+  amount?: number;
+  payment_type?: "donation" | "subscription";
+  subscription_status?: string;
+  subscription_end_date?: string;
+  timestamp: string;
+  message: string;
+}
+
 export async function getAccessKey(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
@@ -692,6 +703,7 @@ export async function generateTopoMap(center?: [number, number], zoom: number = 
 
 /**
  * Generate drone flight plan waypoints
+ * FIXED: Now includes access_key for authentication
  */
 export async function generateFlightPlan(params: {
   area: any;
@@ -700,26 +712,56 @@ export async function generateFlightPlan(params: {
   drone_specs?: any;
 }): Promise<ApiResponse<any>> {
   try {
-    console.log("✈️ Generating flight plan...");
+    console.log("\n========== GENERATING FLIGHT PLAN ==========");
+    console.log("✈️ Generating flight plan with authentication...");
+    
+    // Get access key for authentication
+    const accessKey = await getAccessKey();
+    if (!accessKey) {
+      console.error("❌ No access key found");
+      return {
+        success: false,
+        error: "Authentication required. Please login first.",
+      };
+    }
+
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/generateFlightPlan`);
+    console.log("📊 Parameters:", {
+      altitude: params.altitude,
+      overlap: params.overlap,
+      has_area: !!params.area,
+      has_drone_specs: !!params.drone_specs,
+    });
     
     const response = await fetch(`${FUNCTIONS_BASE}/generateFlightPlan`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        access_key: accessKey,
+        ...params,
+      }),
     });
 
+    console.log("📊 Status:", response.status, response.statusText);
+    
     const data = await response.json();
+    console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
     
     if (response.ok && data.success) {
-      console.log("✅ Flight plan generated");
+      console.log("✅ Flight plan generated successfully");
+      console.log("========== FLIGHT PLAN SUCCESS ==========\n");
       return { success: true, data };
     } else {
-      return { success: false, error: data.error || "Failed to generate flight plan" };
+      const errorMsg = data.error || "Failed to generate flight plan";
+      console.log("❌ Flight plan generation failed:", errorMsg);
+      console.log("========== FLIGHT PLAN FAILED ==========\n");
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
-    console.error("❌ Generate flight plan error:", error);
+    console.error("❌ EXCEPTION during generateFlightPlan:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
@@ -1244,6 +1286,40 @@ export async function squarePayment(accessKey: string, params: {
     }
   } catch (error) {
     console.error("❌ Square payment error:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Check for payment notifications from backend
+ * Poll this periodically to get payment status updates
+ */
+export async function checkPaymentNotifications(accessKey: string): Promise<ApiResponse<PaymentNotification[]>> {
+  try {
+    console.log("🔔 Checking payment notifications...");
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/checkPaymentNotifications`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessKey}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const data = await response.json();
+    
+    if (response.ok && data.success) {
+      console.log("✅ Payment notifications retrieved:", data.notifications?.length || 0);
+      return { success: true, data: data.notifications || [] };
+    } else {
+      return { success: false, error: data.error || "Failed to check notifications" };
+    }
+  } catch (error) {
+    console.error("❌ Check payment notifications error:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
