@@ -133,6 +133,35 @@ export interface PaymentNotification {
   message: string;
 }
 
+export interface FlightPlanSettings {
+  altitude: number;
+  overlap: number;
+  speed: number;
+  gimbal_pitch: number;
+  camera_fov: number;
+  image_width: number;
+  sensor_width: number;
+}
+
+export interface FlightPlanResponse {
+  success: boolean;
+  data?: {
+    project_id: string;
+    waypoints: any[];
+    statistics: {
+      total_waypoints: number;
+      total_photos: number;
+      flight_lines: number;
+      total_distance_meters: number;
+      estimated_flight_time_minutes: number;
+      estimated_battery_usage_percent: number;
+      area_coverage_sq_km: string;
+      gsd_cm_per_pixel: string;
+    };
+  };
+  error?: string;
+}
+
 export async function getAccessKey(): Promise<string | null> {
   try {
     return await AsyncStorage.getItem(ACCESS_KEY_STORAGE);
@@ -736,8 +765,81 @@ export async function generateTopoMap(center?: [number, number], zoom: number = 
 }
 
 /**
- * Generate drone flight plan waypoints
- * FIXED: Now includes access_key for authentication
+ * Generate drone flight plan waypoints (Mobile)
+ * UPDATED: Now uses generateFlightPlanMobile endpoint with proper request format
+ * Sends all settings and GPS coordinates to webapp backend for processing
+ */
+export async function generateFlightPlanMobile(
+  projectId: string,
+  areaCoordinates: Array<{ lat: number; lng: number }>,
+  settings: FlightPlanSettings
+): Promise<FlightPlanResponse> {
+  try {
+    console.log("\n========== GENERATING FLIGHT PLAN (MOBILE) ==========");
+    console.log("✈️ Generating flight plan via mobile endpoint...");
+    
+    // Get access key for authentication
+    const accessKey = await getAccessKey();
+    if (!accessKey) {
+      console.error("❌ No access key found");
+      return {
+        success: false,
+        error: "Authentication required. Please login first.",
+      };
+    }
+
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/generateFlightPlanMobile`);
+    console.log("🆔 Project ID:", projectId);
+    console.log("📊 Area coordinates:", areaCoordinates.length, "points");
+    console.log("⚙️ Settings:", settings);
+    
+    const response = await fetch(`${FUNCTIONS_BASE}/generateFlightPlanMobile`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        access_key: accessKey,
+        project_id: projectId,
+        area_coordinates: areaCoordinates,
+        settings: settings,
+      }),
+    });
+
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response:", JSON.stringify(data).substring(0, 300) + "...");
+    
+    if (response.ok && data.success) {
+      console.log("✅ Flight plan generated successfully");
+      console.log("   - Waypoints:", data.data?.waypoints?.length || 0);
+      console.log("   - Total photos:", data.data?.statistics?.total_photos || 0);
+      console.log("   - Flight time:", data.data?.statistics?.estimated_flight_time_minutes || 0, "min");
+      console.log("========== FLIGHT PLAN SUCCESS ==========\n");
+      return { 
+        success: true, 
+        data: data.data 
+      };
+    } else {
+      const errorMsg = data.error || "Failed to generate flight plan";
+      console.log("❌ Flight plan generation failed:", errorMsg);
+      console.log("========== FLIGHT PLAN FAILED ==========\n");
+      return { success: false, error: errorMsg };
+    }
+  } catch (error) {
+    console.error("❌ EXCEPTION during generateFlightPlanMobile:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Network error",
+    };
+  }
+}
+
+/**
+ * Generate drone flight plan waypoints (Legacy)
+ * DEPRECATED: Use generateFlightPlanMobile instead
  */
 export async function generateFlightPlan(params: {
   area: any;
@@ -746,7 +848,8 @@ export async function generateFlightPlan(params: {
   drone_specs?: any;
 }): Promise<ApiResponse<any>> {
   try {
-    console.log("\n========== GENERATING FLIGHT PLAN ==========");
+    console.log("\n========== GENERATING FLIGHT PLAN (LEGACY) ==========");
+    console.log("⚠️ WARNING: Using legacy flight plan endpoint");
     console.log("✈️ Generating flight plan with authentication...");
     
     // Get access key for authentication

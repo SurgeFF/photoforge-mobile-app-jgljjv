@@ -19,20 +19,22 @@ import { colors } from "@/styles/commonStyles";
 import { IconSymbol } from "@/components/IconSymbol";
 import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
-import { generateFlightPlan, djiUploadFlightPlan, getAccessKey } from "@/utils/apiClient";
+import { generateFlightPlanMobile, djiUploadFlightPlan, getAccessKey } from "@/utils/apiClient";
 import { WebView } from "react-native-webview";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // Hardcoded Google Maps API Key
 const GOOGLE_MAPS_API_KEY = "AIzaSyDCSfZQiUsIAIN73YIyK6EOpaIuMtnD4aE";
 
-interface FlightPlanMetadata {
+interface FlightPlanStatistics {
   total_waypoints: number;
+  total_photos: number;
+  flight_lines: number;
+  total_distance_meters: number;
   estimated_flight_time_minutes: number;
-  estimated_photos: number;
-  total_distance_km: number;
-  battery_usage_percent: number;
-  ground_sample_distance_cm: number;
+  estimated_battery_usage_percent: number;
+  area_coverage_sq_km: string;
+  gsd_cm_per_pixel: string;
 }
 
 interface Waypoint {
@@ -53,8 +55,8 @@ export default function FlightPlanningScreen() {
   // Mission Configuration
   const [missionName, setMissionName] = useState("DA3S Mapping");
   const [droneModel, setDroneModel] = useState("phantom4pro");
-  const [targetAGL, setTargetAGL] = useState("164");
-  const [globalSpeed, setGlobalSpeed] = useState("5");
+  const [targetAGL, setTargetAGL] = useState("120");
+  const [globalSpeed, setGlobalSpeed] = useState("10");
   const [gimbalPitch, setGimbalPitch] = useState("-90");
   const [finishAction, setFinishAction] = useState("gohome");
   const [exitOnRCLost, setExitOnRCLost] = useState(true);
@@ -66,7 +68,7 @@ export default function FlightPlanningScreen() {
 
   // Grid Pattern Generator
   const [gridSpacing, setGridSpacing] = useState("medium");
-  const [photoOverlap, setPhotoOverlap] = useState("70");
+  const [photoOverlap, setPhotoOverlap] = useState("75");
   const [flightLineSpacing, setFlightLineSpacing] = useState("auto");
 
   // Camera specs (DJI Phantom 4 Pro defaults)
@@ -75,6 +77,7 @@ export default function FlightPlanningScreen() {
   const [focalLength, setFocalLength] = useState("8.8");
   const [imageWidth, setImageWidth] = useState("5472");
   const [imageHeight, setImageHeight] = useState("3648");
+  const [cameraFOV, setCameraFOV] = useState("84");
 
   // Address search
   const [searchAddress, setSearchAddress] = useState("");
@@ -85,9 +88,9 @@ export default function FlightPlanningScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [flightPlanData, setFlightPlanData] = useState<{
     waypoints: Waypoint[];
-    metadata: FlightPlanMetadata;
+    statistics: FlightPlanStatistics;
   } | null>(null);
-  const [drawnArea, setDrawnArea] = useState<any>(null);
+  const [drawnArea, setDrawnArea] = useState<Array<{ lat: number; lng: number }> | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [mapReady, setMapReady] = useState(false);
 
@@ -100,6 +103,7 @@ export default function FlightPlanningScreen() {
       focal_length: 8.8,
       image_width: 5472,
       image_height: 3648,
+      camera_fov: 84,
     },
     mavic2pro: {
       name: "DJI Mavic 2 Pro",
@@ -108,6 +112,7 @@ export default function FlightPlanningScreen() {
       focal_length: 10.26,
       image_width: 5472,
       image_height: 3648,
+      camera_fov: 77,
     },
     mavic3: {
       name: "DJI Mavic 3",
@@ -116,6 +121,7 @@ export default function FlightPlanningScreen() {
       focal_length: 24,
       image_width: 5280,
       image_height: 3956,
+      camera_fov: 84,
     },
     matrice30: {
       name: "DJI Matrice 30",
@@ -124,6 +130,7 @@ export default function FlightPlanningScreen() {
       focal_length: 24,
       image_width: 8000,
       image_height: 6000,
+      camera_fov: 84,
     },
     air2s: {
       name: "DJI Air 2S",
@@ -132,6 +139,7 @@ export default function FlightPlanningScreen() {
       focal_length: 8.8,
       image_width: 5472,
       image_height: 3648,
+      camera_fov: 88,
     },
     mini3pro: {
       name: "DJI Mini 3 Pro",
@@ -140,6 +148,7 @@ export default function FlightPlanningScreen() {
       focal_length: 6.72,
       image_width: 4032,
       image_height: 3024,
+      camera_fov: 82.1,
     },
   };
 
@@ -152,6 +161,7 @@ export default function FlightPlanningScreen() {
       setFocalLength(preset.focal_length.toString());
       setImageWidth(preset.image_width.toString());
       setImageHeight(preset.image_height.toString());
+      setCameraFOV(preset.camera_fov.toString());
     }
   };
 
@@ -200,10 +210,10 @@ export default function FlightPlanningScreen() {
       return;
     }
 
-    if (!drawnArea) {
+    if (!drawnArea || drawnArea.length < 3) {
       Alert.alert(
         "No Area Defined",
-        "Please draw a polygon on the map to define the flight area. Use the drawing tools on the map to create a boundary.",
+        "Please draw a polygon on the map to define the flight area. Use the drawing tools on the map to create a boundary with at least 3 points.",
         [
           { text: "Use Demo Area", onPress: () => generatePlan() },
           { text: "Cancel", style: "cancel" },
@@ -232,65 +242,61 @@ export default function FlightPlanningScreen() {
     setIsGenerating(true);
 
     try {
-      console.log("🛫 Generating flight plan with parameters:", {
-        altitude: parseInt(targetAGL),
-        overlap: parseInt(photoOverlap),
-        speed: parseInt(globalSpeed),
-        gimbalAngle: parseInt(gimbalPitch),
-        terrainFollowing: enableTerrainFollowing,
-        gridSpacing: gridSpacing,
-      });
+      console.log("🛫 Generating flight plan with new mobile endpoint...");
 
-      // Calculate spacing based on grid setting
-      let spacingMultiplier = 1.0;
-      if (gridSpacing === "fine") spacingMultiplier = 0.7;
-      else if (gridSpacing === "coarse") spacingMultiplier = 1.5;
-
-      // Get access key for authentication
-      const accessKey = await getAccessKey();
-      if (!accessKey) {
-        Alert.alert("Error", "Authentication required. Please login first.");
-        router.replace("/(tabs)/(home)/");
+      // Validate project ID
+      if (!projectId) {
+        Alert.alert("Error", "No project selected. Please select a project first.");
+        router.back();
         return;
       }
 
-      const result = await generateFlightPlan({
-        area: drawnArea || {
-          type: "Polygon",
-          coordinates: [
-            [
-              [-122.4194, 37.7749],
-              [-122.4184, 37.7749],
-              [-122.4184, 37.7739],
-              [-122.4194, 37.7739],
-              [-122.4194, 37.7749],
-            ],
-          ],
-        },
-        altitude: parseInt(targetAGL) * 0.3048, // Convert feet to meters
+      // Prepare area coordinates
+      const areaCoordinates = drawnArea || [
+        { lat: 37.7749, lng: -122.4194 },
+        { lat: 37.7750, lng: -122.4194 },
+        { lat: 37.7750, lng: -122.4180 },
+        { lat: 37.7749, lng: -122.4180 },
+      ];
+
+      console.log("📊 Flight plan parameters:");
+      console.log("   - Project ID:", projectId);
+      console.log("   - Area coordinates:", areaCoordinates.length, "points");
+      console.log("   - Altitude:", targetAGL, "meters");
+      console.log("   - Overlap:", photoOverlap, "%");
+      console.log("   - Speed:", globalSpeed, "m/s");
+      console.log("   - Gimbal pitch:", gimbalPitch, "°");
+
+      // Prepare settings object matching backend API
+      const settings = {
+        altitude: parseInt(targetAGL),
         overlap: parseInt(photoOverlap),
-        drone_specs: {
-          sensor_width: parseFloat(sensorWidth),
-          sensor_height: parseFloat(sensorHeight),
-          focal_length: parseFloat(focalLength),
-          image_width: parseInt(imageWidth),
-          image_height: parseInt(imageHeight),
-          max_speed: parseInt(globalSpeed),
-          gimbal_angle: parseInt(gimbalPitch),
-          spacing_multiplier: spacingMultiplier,
-          terrain_following: enableTerrainFollowing,
-          min_clearance: enableTerrainFollowing ? parseFloat(minClearance) * 0.3048 : undefined,
-          obstacle_margin: enableTerrainFollowing ? parseFloat(obstacleSafetyMargin) * 0.3048 : undefined,
-        },
-      });
+        speed: parseInt(globalSpeed),
+        gimbal_pitch: parseInt(gimbalPitch),
+        camera_fov: parseFloat(cameraFOV),
+        image_width: parseInt(imageWidth),
+        sensor_width: parseFloat(sensorWidth),
+      };
+
+      console.log("⚙️ Settings:", settings);
+
+      // Call the new mobile endpoint
+      const result = await generateFlightPlanMobile(
+        projectId,
+        areaCoordinates,
+        settings
+      );
 
       console.log("📊 Flight plan result:", result);
 
-      if (result.success) {
-        const planData = result.data?.data || result.data;
+      if (result.success && result.data) {
+        const planData = result.data;
         
-        if (planData && planData.waypoints && planData.metadata) {
-          setFlightPlanData(planData);
+        if (planData.waypoints && planData.statistics) {
+          setFlightPlanData({
+            waypoints: planData.waypoints,
+            statistics: planData.statistics,
+          });
           
           // Send waypoints to map for visualization
           if (webViewRef.current && planData.waypoints) {
@@ -303,9 +309,18 @@ export default function FlightPlanningScreen() {
             `);
           }
 
+          const stats = planData.statistics;
           Alert.alert(
             "Success",
-            `Flight plan generated!\n\n${planData.metadata.total_waypoints} waypoints\n${planData.metadata.estimated_photos} photos\n${planData.metadata.estimated_flight_time_minutes.toFixed(1)} minutes\n${planData.metadata.total_distance_km.toFixed(2)} km`,
+            `Flight plan generated!\n\n` +
+            `• ${stats.total_waypoints} waypoints\n` +
+            `• ${stats.total_photos} photos\n` +
+            `• ${stats.flight_lines} flight lines\n` +
+            `• ${stats.estimated_flight_time_minutes.toFixed(1)} minutes\n` +
+            `• ${(stats.total_distance_meters / 1000).toFixed(2)} km\n` +
+            `• ${stats.estimated_battery_usage_percent}% battery\n` +
+            `• ${stats.area_coverage_sq_km} km² coverage\n` +
+            `• ${stats.gsd_cm_per_pixel} cm/px GSD`,
             [
               {
                 text: "Upload to Drone",
@@ -340,7 +355,7 @@ export default function FlightPlanningScreen() {
     try {
       const result = await djiUploadFlightPlan(flightPlanData.waypoints, {
         mission_name: missionName,
-        altitude: parseInt(targetAGL) * 0.3048,
+        altitude: parseInt(targetAGL),
         speed: parseInt(globalSpeed),
         gimbal_angle: parseInt(gimbalPitch),
         finish_action: finishAction,
@@ -398,9 +413,17 @@ export default function FlightPlanningScreen() {
       const data = JSON.parse(event.nativeEvent.data);
       
       if (data.type === "area_drawn") {
-        setDrawnArea(data.area);
-        console.log("✅ Area drawn:", data.area);
-        Alert.alert("Area Defined", "Flight area has been defined. You can now generate the flight plan.");
+        // Extract coordinates from the polygon
+        const coordinates = data.area.coordinates[0];
+        // Convert to array of {lat, lng} objects, excluding the closing point
+        const areaCoords = coordinates.slice(0, -1).map((coord: [number, number]) => ({
+          lat: coord[1],
+          lng: coord[0],
+        }));
+        
+        setDrawnArea(areaCoords);
+        console.log("✅ Area drawn:", areaCoords.length, "points");
+        Alert.alert("Area Defined", `Flight area defined with ${areaCoords.length} points. You can now generate the flight plan.`);
       } else if (data.type === "map_ready") {
         console.log("✅ Map is ready");
         setMapReady(true);
@@ -675,6 +698,19 @@ export default function FlightPlanningScreen() {
               <Text style={styles.mapHelpText}>
                 📍 Use the drawing tools to define your flight area. Tap the polygon or rectangle icon on the map.
               </Text>
+              {drawnArea && (
+                <View style={styles.infoBox}>
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check_circle"
+                    size={20}
+                    color={colors.success}
+                  />
+                  <Text style={[styles.infoText, { color: colors.success }]}>
+                    Area defined with {drawnArea.length} points. Ready to generate flight plan!
+                  </Text>
+                </View>
+              )}
               <View style={styles.infoBox}>
                 <IconSymbol
                   ios_icon_name="info.circle.fill"
@@ -738,25 +774,25 @@ export default function FlightPlanningScreen() {
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Target AGL (ft) *</Text>
-              <Text style={styles.valueLabel}>{targetAGL} ft</Text>
+              <Text style={styles.label}>Target Altitude (m) *</Text>
+              <Text style={styles.valueLabel}>{targetAGL} m</Text>
             </View>
             <TextInput
               style={styles.input}
               value={targetAGL}
               onChangeText={setTargetAGL}
               keyboardType="numeric"
-              placeholder="164"
+              placeholder="120"
               placeholderTextColor={colors.textSecondary}
             />
             <Text style={styles.helpText}>
-              Above Ground Level altitude in feet
+              Flight altitude in meters (120m = 400ft)
             </Text>
           </View>
 
           <View style={styles.inputGroup}>
             <View style={styles.labelRow}>
-              <Text style={styles.label}>Global Speed (m/s)</Text>
+              <Text style={styles.label}>Flight Speed (m/s)</Text>
               <Text style={styles.valueLabel}>{globalSpeed} m/s</Text>
             </View>
             <TextInput
@@ -764,7 +800,7 @@ export default function FlightPlanningScreen() {
               value={globalSpeed}
               onChangeText={setGlobalSpeed}
               keyboardType="numeric"
-              placeholder="5"
+              placeholder="10"
               placeholderTextColor={colors.textSecondary}
             />
             <Text style={styles.helpText}>
@@ -787,6 +823,24 @@ export default function FlightPlanningScreen() {
             />
             <Text style={styles.helpText}>
               -90° = straight down (nadir), -45° = oblique
+            </Text>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Photo Overlap (%)</Text>
+              <Text style={styles.valueLabel}>{photoOverlap}%</Text>
+            </View>
+            <TextInput
+              style={styles.input}
+              value={photoOverlap}
+              onChangeText={setPhotoOverlap}
+              keyboardType="numeric"
+              placeholder="75"
+              placeholderTextColor={colors.textSecondary}
+            />
+            <Text style={styles.helpText}>
+              Higher overlap = better 3D reconstruction but more photos
             </Text>
           </View>
 
@@ -837,127 +891,6 @@ export default function FlightPlanningScreen() {
           </View>
         </View>
 
-        {/* Terrain Following */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Terrain Following</Text>
-          <Text style={styles.sectionSubtitle}>
-            Configure before generating grid. Uses Google Elevation API to adjust waypoint altitudes based on ground elevation.
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Min Clearance (ft)</Text>
-              <Text style={styles.valueLabel}>{minClearance} ft</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={minClearance}
-              onChangeText={setMinClearance}
-              keyboardType="numeric"
-              placeholder="50"
-              placeholderTextColor={colors.textSecondary}
-              editable={enableTerrainFollowing}
-            />
-            <Text style={styles.helpText}>
-              Minimum clearance above terrain
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Obstacle Safety Margin (ft)</Text>
-              <Text style={styles.valueLabel}>{obstacleSafetyMargin} ft</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={obstacleSafetyMargin}
-              onChangeText={setObstacleSafetyMargin}
-              keyboardType="numeric"
-              placeholder="30"
-              placeholderTextColor={colors.textSecondary}
-              editable={enableTerrainFollowing}
-            />
-            <Text style={styles.helpText}>
-              Additional safety buffer for obstacles
-            </Text>
-          </View>
-
-          <View style={styles.switchRow}>
-            <View style={styles.switchLabel}>
-              <Text style={styles.label}>Enable Terrain Following</Text>
-              <Text style={styles.helpText}>Maintain consistent AGL throughout mission</Text>
-            </View>
-            <Switch
-              value={enableTerrainFollowing}
-              onValueChange={setEnableTerrainFollowing}
-              trackColor={{ false: colors.textSecondary, true: colors.primary }}
-              thumbColor={colors.surface}
-            />
-          </View>
-        </View>
-
-        {/* Grid Pattern Generator */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Grid Pattern Generator</Text>
-          <Text style={styles.sectionSubtitle}>
-            Draw a survey area first by clicking "Draw Area" above, then click on the map to define your polygon
-          </Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Flight Path Segmentation</Text>
-            <View style={styles.radioGroup}>
-              <Pressable
-                style={[styles.radioButton, gridSpacing === "fine" && styles.radioButtonSelected]}
-                onPress={() => setGridSpacing("fine")}
-              >
-                <View style={[styles.radioCircle, gridSpacing === "fine" && styles.radioCircleSelected]}>
-                  {gridSpacing === "fine" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Fine</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.radioButton, gridSpacing === "medium" && styles.radioButtonSelected]}
-                onPress={() => setGridSpacing("medium")}
-              >
-                <View style={[styles.radioCircle, gridSpacing === "medium" && styles.radioCircleSelected]}>
-                  {gridSpacing === "medium" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Medium</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.radioButton, gridSpacing === "coarse" && styles.radioButtonSelected]}
-                onPress={() => setGridSpacing("coarse")}
-              >
-                <View style={[styles.radioCircle, gridSpacing === "coarse" && styles.radioCircleSelected]}>
-                  {gridSpacing === "coarse" && <View style={styles.radioInner} />}
-                </View>
-                <Text style={styles.radioText}>Coarse</Text>
-              </Pressable>
-            </View>
-            <Text style={styles.helpText}>
-              Fine = More waypoints, better coverage. Coarse = Fewer waypoints, faster mission
-            </Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>Photo Overlap (%)</Text>
-              <Text style={styles.valueLabel}>{photoOverlap}%</Text>
-            </View>
-            <TextInput
-              style={styles.input}
-              value={photoOverlap}
-              onChangeText={setPhotoOverlap}
-              keyboardType="numeric"
-              placeholder="70"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.helpText}>
-              Higher overlap = better 3D reconstruction but more photos
-            </Text>
-          </View>
-        </View>
-
         {/* Advanced Settings */}
         <Pressable
           style={styles.advancedToggle}
@@ -1001,13 +934,13 @@ export default function FlightPlanningScreen() {
 
             <View style={styles.inputRow}>
               <View style={styles.inputGroupHalf}>
-                <Text style={styles.label}>Focal Length (mm)</Text>
+                <Text style={styles.label}>Camera FOV (°)</Text>
                 <TextInput
                   style={styles.input}
-                  value={focalLength}
-                  onChangeText={setFocalLength}
+                  value={cameraFOV}
+                  onChangeText={setCameraFOV}
                   keyboardType="numeric"
-                  placeholder="8.8"
+                  placeholder="84"
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
@@ -1051,7 +984,7 @@ export default function FlightPlanningScreen() {
                   color={colors.primary}
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.total_waypoints}
+                  {flightPlanData.statistics.total_waypoints}
                 </Text>
                 <Text style={styles.statLabel}>Waypoints</Text>
               </View>
@@ -1063,7 +996,7 @@ export default function FlightPlanningScreen() {
                   color={colors.primary}
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.estimated_photos}
+                  {flightPlanData.statistics.total_photos}
                 </Text>
                 <Text style={styles.statLabel}>Photos</Text>
               </View>
@@ -1075,7 +1008,7 @@ export default function FlightPlanningScreen() {
                   color={colors.primaryDark}
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.estimated_flight_time_minutes.toFixed(1)}
+                  {flightPlanData.statistics.estimated_flight_time_minutes.toFixed(1)}
                 </Text>
                 <Text style={styles.statLabel}>Minutes</Text>
               </View>
@@ -1087,7 +1020,7 @@ export default function FlightPlanningScreen() {
                   color={colors.primaryDark}
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.total_distance_km.toFixed(2)}
+                  {(flightPlanData.statistics.total_distance_meters / 1000).toFixed(2)}
                 </Text>
                 <Text style={styles.statLabel}>Kilometers</Text>
               </View>
@@ -1097,13 +1030,13 @@ export default function FlightPlanningScreen() {
                   android_material_icon_name="battery_std"
                   size={24}
                   color={
-                    flightPlanData.metadata.battery_usage_percent > 80
+                    flightPlanData.statistics.estimated_battery_usage_percent > 80
                       ? colors.error
                       : colors.success
                   }
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.battery_usage_percent}%
+                  {flightPlanData.statistics.estimated_battery_usage_percent}%
                 </Text>
                 <Text style={styles.statLabel}>Battery</Text>
               </View>
@@ -1115,13 +1048,13 @@ export default function FlightPlanningScreen() {
                   color={colors.primaryDark}
                 />
                 <Text style={styles.statValue}>
-                  {flightPlanData.metadata.ground_sample_distance_cm.toFixed(1)}
+                  {flightPlanData.statistics.gsd_cm_per_pixel}
                 </Text>
-                <Text style={styles.statLabel}>GSD (cm)</Text>
+                <Text style={styles.statLabel}>GSD (cm/px)</Text>
               </View>
             </View>
 
-            {flightPlanData.metadata.battery_usage_percent > 80 && (
+            {flightPlanData.statistics.estimated_battery_usage_percent > 80 && (
               <View style={styles.warningBox}>
                 <IconSymbol
                   ios_icon_name="exclamationmark.triangle.fill"
