@@ -22,6 +22,14 @@ import { IconSymbol } from '@/components/IconSymbol';
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { colors } from '@/styles/commonStyles';
 
+export interface TabBarItem {
+  name: string;
+  route: Href;
+  icon: string;
+  androidIcon: keyof typeof MaterialIcons.glyphMap;
+  label: string;
+}
+
 interface FloatingTabBarProps {
   tabs: TabBarItem[];
   containerWidth?: number;

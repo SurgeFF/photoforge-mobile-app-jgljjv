@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,9 @@ import TopographicBackground from "@/components/TopographicBackground";
 import Button from "@/components/button";
 import { generateFlightPlan, djiUploadFlightPlan } from "@/utils/apiClient";
 import { WebView } from "react-native-webview";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const GOOGLE_MAPS_API_KEY_STORAGE = "@photoforge_google_maps_api_key";
 
 interface FlightPlanMetadata {
   total_waypoints: number;
@@ -70,6 +73,33 @@ export default function FlightPlanningScreen() {
   const [selectedDrone, setSelectedDrone] = useState("phantom4pro");
   const [mapProvider, setMapProvider] = useState<"osm" | "google">("osm");
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState("");
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+
+  // Load saved Google Maps API key
+  useEffect(() => {
+    loadGoogleMapsApiKey();
+  }, []);
+
+  const loadGoogleMapsApiKey = async () => {
+    try {
+      const savedKey = await AsyncStorage.getItem(GOOGLE_MAPS_API_KEY_STORAGE);
+      if (savedKey) {
+        setGoogleMapsApiKey(savedKey);
+        console.log("✅ Loaded saved Google Maps API key");
+      }
+    } catch (error) {
+      console.error("❌ Error loading Google Maps API key:", error);
+    }
+  };
+
+  const saveGoogleMapsApiKey = async (key: string) => {
+    try {
+      await AsyncStorage.setItem(GOOGLE_MAPS_API_KEY_STORAGE, key);
+      console.log("✅ Saved Google Maps API key");
+    } catch (error) {
+      console.error("❌ Error saving Google Maps API key:", error);
+    }
+  };
 
   // Drone presets
   const dronePresets: Record<string, any> = {
@@ -320,6 +350,26 @@ export default function FlightPlanningScreen() {
       }
     } catch (error) {
       console.error("❌ Error parsing WebView message:", error);
+    }
+  };
+
+  const handleSaveApiKey = () => {
+    if (googleMapsApiKey.trim()) {
+      saveGoogleMapsApiKey(googleMapsApiKey.trim());
+      setShowApiKeyInput(false);
+      Alert.alert(
+        "API Key Saved",
+        "Your Google Maps API key has been saved. You can now use Google Maps.",
+        [
+          {
+            text: "Use Google Maps",
+            onPress: () => setMapProvider("google"),
+          },
+          { text: "OK" },
+        ]
+      );
+    } else {
+      Alert.alert("Error", "Please enter a valid API key");
     }
   };
 
@@ -631,8 +681,11 @@ export default function FlightPlanningScreen() {
                 if (!googleMapsApiKey) {
                   Alert.alert(
                     "Google Maps API Key Required",
-                    "Please enter your Google Maps API key in the Advanced Settings section below.",
-                    [{ text: "OK" }]
+                    "You need to configure your Google Maps API key to use Google Maps. Would you like to add it now?",
+                    [
+                      { text: "Cancel", style: "cancel" },
+                      { text: "Add API Key", onPress: () => setShowApiKeyInput(true) },
+                    ]
                   );
                 } else {
                   setMapProvider("google");
@@ -655,21 +708,68 @@ export default function FlightPlanningScreen() {
               </Text>
             </Pressable>
           </View>
-          {mapProvider === "google" && !googleMapsApiKey && (
-            <View style={styles.apiKeyInput}>
-              <Text style={styles.label}>Google Maps API Key</Text>
+          
+          {/* Google Maps API Key Configuration */}
+          {showApiKeyInput && (
+            <View style={styles.apiKeySection}>
+              <Text style={styles.apiKeyTitle}>Configure Google Maps API Key</Text>
+              <Text style={styles.apiKeyHelp}>
+                To use Google Maps, you need to provide your own API key. Get one from the Google Cloud Console:
+              </Text>
+              <Text style={styles.apiKeySteps}>
+                1. Go to console.cloud.google.com{'\n'}
+                2. Create a project or select existing{'\n'}
+                3. Enable Maps JavaScript API{'\n'}
+                4. Create credentials (API Key){'\n'}
+                5. Paste your API key below
+              </Text>
               <TextInput
-                style={styles.input}
+                style={styles.apiKeyInput}
                 value={googleMapsApiKey}
                 onChangeText={setGoogleMapsApiKey}
-                placeholder="Enter your API key"
+                placeholder="AIzaSy..."
                 placeholderTextColor={colors.textSecondary}
                 autoCapitalize="none"
                 autoCorrect={false}
+                multiline={false}
               />
-              <Text style={styles.helpText}>
-                Get your API key from Google Cloud Console
+              <View style={styles.apiKeyButtons}>
+                <Button
+                  onPress={() => setShowApiKeyInput(false)}
+                  variant="outline"
+                  style={styles.apiKeyButton}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onPress={handleSaveApiKey}
+                  style={styles.apiKeyButton}
+                >
+                  Save API Key
+                </Button>
+              </View>
+            </View>
+          )}
+
+          {googleMapsApiKey && !showApiKeyInput && (
+            <View style={styles.apiKeyStatus}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={20}
+                color={colors.success}
+              />
+              <Text style={styles.apiKeyStatusText}>
+                Google Maps API key configured
               </Text>
+              <Pressable onPress={() => setShowApiKeyInput(true)}>
+                <IconSymbol
+                  ios_icon_name="pencil"
+                  android_material_icon_name="edit"
+                  size={20}
+                  color={colors.primary}
+                />
+              </Pressable>
             </View>
           )}
         </View>
@@ -1195,8 +1295,65 @@ const styles = StyleSheet.create({
   mapProviderButtonTextActive: {
     color: colors.surface,
   },
-  apiKeyInput: {
+  apiKeySection: {
     marginTop: 16,
+    padding: 16,
+    backgroundColor: colors.surface + "CC",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  apiKeyTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  apiKeyHelp: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: 12,
+  },
+  apiKeySteps: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  apiKeyInput: {
+    height: 44,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.backgroundLight,
+    color: colors.textPrimary,
+    marginBottom: 12,
+  },
+  apiKeyButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  apiKeyButton: {
+    flex: 1,
+  },
+  apiKeyStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: colors.success + "20",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.success,
+  },
+  apiKeyStatusText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.success,
+    fontWeight: "600",
   },
   mapContainer: {
     marginBottom: 24,
