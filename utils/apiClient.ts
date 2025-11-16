@@ -5,7 +5,7 @@
  * This utility provides functions to interact with the PhotoForge backend API.
  * 
  * Base URL: https://photoforge.base44.app
- * Firebase Storage: gs://gen-lang-client-0688382477.firebasestorage.app
+ * Storage: base.44 backend storage (reverted from Firebase Cloud Storage)
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,9 +15,6 @@ const FUNCTIONS_BASE = `${WEBAPP_URL}/api/functions`;
 const ENTITIES_BASE = `${WEBAPP_URL}/api/entities`;
 const INTEGRATIONS_BASE = `${WEBAPP_URL}/api/integrations`;
 const ACCESS_KEY_STORAGE = "@photoforge_access_key";
-
-// Firebase Storage configuration
-export const FIREBASE_STORAGE_BUCKET = "gs://gen-lang-client-0688382477.firebasestorage.app";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -594,6 +591,7 @@ export async function getProcessedModels(accessKey: string, projectId: string): 
 
 /**
  * Upload single media file to project
+ * REVERTED: Now uses base.44 backend storage instead of Firebase Cloud Storage
  */
 export async function uploadMediaMobile(
   accessKey: string,
@@ -606,9 +604,10 @@ export async function uploadMediaMobile(
   metadata?: any
 ): Promise<MediaUploadResponse> {
   try {
-    console.log("\n========== UPLOADING MEDIA FILE ==========");
+    console.log("\n========== UPLOADING MEDIA FILE (BASE.44 STORAGE) ==========");
     console.log("📤 Uploading single file to project:", projectId);
     console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/uploadMediaMobile`);
+    console.log("💾 Storage: base.44 backend storage");
     console.log("📁 File name:", file.name);
     console.log("📄 File type:", file.type);
     
@@ -641,7 +640,7 @@ export async function uploadMediaMobile(
     console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
     
     if (response.ok && data.success) {
-      console.log("✅ File uploaded successfully");
+      console.log("✅ File uploaded successfully to base.44 storage");
       console.log("========== UPLOAD SUCCESS ==========\n");
       return { success: true, data: data.data };
     } else {
@@ -661,6 +660,7 @@ export async function uploadMediaMobile(
 
 /**
  * Upload multiple media files to project in batch
+ * REVERTED: Now uses base.44 backend storage instead of Firebase Cloud Storage
  * NO FILE LIMIT - All files are sent to webapp for processing
  */
 export async function uploadMediaBatchMobile(
@@ -674,9 +674,10 @@ export async function uploadMediaBatchMobile(
   }>
 ): Promise<BatchUploadResponse> {
   try {
-    console.log("\n========== UPLOADING MEDIA BATCH ==========");
+    console.log("\n========== UPLOADING MEDIA BATCH (BASE.44 STORAGE) ==========");
     console.log("📤 Uploading batch of files to project:", projectId);
     console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/uploadMediaBatchMobile`);
+    console.log("💾 Storage: base.44 backend storage");
     console.log("📁 File count:", files.length);
     console.log("🚀 NO FILE LIMIT - Webapp will handle all files");
     
@@ -712,7 +713,7 @@ export async function uploadMediaBatchMobile(
     console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
     
     if (response.ok && data.success) {
-      console.log("✅ Batch upload completed");
+      console.log("✅ Batch upload completed to base.44 storage");
       console.log("   - Uploaded:", data.data?.uploaded_count || 0);
       console.log("   - Failed:", data.data?.failed_count || 0);
       console.log("========== BATCH UPLOAD SUCCESS ==========\n");
