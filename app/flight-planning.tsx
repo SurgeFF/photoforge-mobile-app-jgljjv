@@ -61,11 +61,16 @@ export default function FlightPlanningScreen() {
   const [targetAGL, setTargetAGL] = useState("120");
   const [globalSpeed, setGlobalSpeed] = useState("10");
   const [gimbalPitch, setGimbalPitch] = useState("-90");
+  
+  // NEW: Finish Action and RC Signal Lost Settings
   const [finishAction, setFinishAction] = useState("gohome");
   const [exitOnRCLost, setExitOnRCLost] = useState(true);
+  const [showFinishActionModal, setShowFinishActionModal] = useState(false);
 
   // Terrain Following
   const [enableTerrainFollowing, setEnableTerrainFollowing] = useState(false);
+  const [minClearance, setMinClearance] = useState("30");
+  const [obstacleSafetyMargin, setObstacleSafetyMargin] = useState("10");
 
   // Grid Pattern Generator - Segmentation (0-100)
   const [segmentation, setSegmentation] = useState(50);
@@ -95,6 +100,14 @@ export default function FlightPlanningScreen() {
   // File type selection modal
   const [showFileTypeModal, setShowFileTypeModal] = useState(false);
   const [selectedFileType, setSelectedFileType] = useState<"json" | "kml" | "csv">("json");
+
+  // Finish action options
+  const finishActionOptions = [
+    { value: "gohome", label: "Go Home", icon: { ios: "house.fill", android: "home" } },
+    { value: "hover", label: "Hover", icon: { ios: "pause.circle.fill", android: "pause_circle" } },
+    { value: "land", label: "Land", icon: { ios: "arrow.down.circle.fill", android: "flight_land" } },
+    { value: "continue", label: "Continue", icon: { ios: "arrow.right.circle.fill", android: "arrow_forward" } },
+  ];
 
   // Drone presets
   const dronePresets: Record<string, any> = {
@@ -243,7 +256,11 @@ export default function FlightPlanningScreen() {
       console.log("   - Overlap:", photoOverlap, "%");
       console.log("   - Speed:", globalSpeed, "m/s");
       console.log("   - Gimbal pitch:", gimbalPitch, "°");
+      console.log("   - Finish action:", finishAction);
+      console.log("   - Exit on RC lost:", exitOnRCLost);
       console.log("   - Terrain following:", enableTerrainFollowing);
+      console.log("   - Min clearance:", minClearance, "m");
+      console.log("   - Obstacle safety margin:", obstacleSafetyMargin, "m");
       console.log("   - Segmentation:", segmentation);
 
       // Prepare settings object matching backend API
@@ -256,7 +273,11 @@ export default function FlightPlanningScreen() {
         image_width: parseInt(imageWidth),
         sensor_width: parseFloat(sensorWidth),
         terrain_following: enableTerrainFollowing,
+        min_clearance: enableTerrainFollowing ? parseInt(minClearance) : undefined,
+        obstacle_safety_margin: enableTerrainFollowing ? parseInt(obstacleSafetyMargin) : undefined,
         segmentation: segmentation,
+        finish_action: finishAction,
+        exit_on_rc_lost: exitOnRCLost,
       };
 
       console.log("⚙️ Settings:", settings);
@@ -563,6 +584,11 @@ export default function FlightPlanningScreen() {
     `;
   };
 
+  const getFinishActionLabel = () => {
+    const option = finishActionOptions.find(opt => opt.value === finishAction);
+    return option?.label || "Go Home";
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TopographicBackground />
@@ -794,6 +820,43 @@ export default function FlightPlanningScreen() {
               </Text>
             </View>
 
+            {/* NEW: Finish Action Setting */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Finish Action</Text>
+              <Pressable
+                style={styles.selectButton}
+                onPress={() => setShowFinishActionModal(true)}
+              >
+                <Text style={styles.selectButtonText}>{getFinishActionLabel()}</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.down"
+                  android_material_icon_name="expand_more"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+              <Text style={styles.helpText}>
+                What the drone should do when the flight plan is completed
+              </Text>
+            </View>
+
+            {/* NEW: Exit on RC Signal Lost Setting */}
+            <View style={styles.switchRow}>
+              <View style={styles.switchLabel}>
+                <Text style={styles.label}>Exit Mission on RC Signal Lost</Text>
+                <Text style={styles.helpText}>
+                  Automatically exit mission if remote controller signal is lost
+                </Text>
+              </View>
+              <Switch
+                value={exitOnRCLost}
+                onValueChange={setExitOnRCLost}
+                trackColor={{ false: colors.textSecondary, true: colors.primary }}
+                thumbColor={colors.surface}
+              />
+            </View>
+
+            {/* Terrain Following Section */}
             <View style={styles.switchRow}>
               <View style={styles.switchLabel}>
                 <Text style={styles.label}>Terrain Following</Text>
@@ -806,6 +869,47 @@ export default function FlightPlanningScreen() {
                 thumbColor={colors.surface}
               />
             </View>
+
+            {/* NEW: Terrain Following Parameters */}
+            {enableTerrainFollowing && (
+              <View style={styles.terrainSettingsContainer}>
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Min Clearance (m)</Text>
+                    <Text style={styles.valueLabel}>{minClearance} m</Text>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    value={minClearance}
+                    onChangeText={setMinClearance}
+                    keyboardType="numeric"
+                    placeholder="30"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={styles.helpText}>
+                    Minimum clearance above terrain
+                  </Text>
+                </View>
+
+                <View style={styles.inputGroup}>
+                  <View style={styles.labelRow}>
+                    <Text style={styles.label}>Obstacle Safety Margin (m)</Text>
+                    <Text style={styles.valueLabel}>{obstacleSafetyMargin} m</Text>
+                  </View>
+                  <TextInput
+                    style={styles.input}
+                    value={obstacleSafetyMargin}
+                    onChangeText={setObstacleSafetyMargin}
+                    keyboardType="numeric"
+                    placeholder="10"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                  <Text style={styles.helpText}>
+                    Additional safety margin for obstacle avoidance
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {flightPlanData && (
@@ -932,6 +1036,67 @@ export default function FlightPlanningScreen() {
           </View>
         </ScrollView>
       </View>
+
+      {/* Finish Action Selection Modal */}
+      <Modal
+        visible={showFinishActionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFinishActionModal(false)}
+      >
+        <Pressable 
+          style={styles.modalOverlay}
+          onPress={() => setShowFinishActionModal(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Finish Action</Text>
+            <Text style={styles.modalSubtitle}>Select what the drone should do when the flight plan is completed</Text>
+
+            {finishActionOptions.map((option) => (
+              <Pressable
+                key={option.value}
+                style={[
+                  styles.finishActionOption,
+                  finishAction === option.value && styles.finishActionOptionSelected,
+                ]}
+                onPress={() => {
+                  setFinishAction(option.value);
+                  setShowFinishActionModal(false);
+                }}
+              >
+                <IconSymbol
+                  ios_icon_name={option.icon.ios}
+                  android_material_icon_name={option.icon.android}
+                  size={24}
+                  color={finishAction === option.value ? colors.primary : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.finishActionText,
+                  finishAction === option.value && styles.finishActionTextSelected,
+                ]}>
+                  {option.label}
+                </Text>
+                {finishAction === option.value && (
+                  <IconSymbol
+                    ios_icon_name="checkmark.circle.fill"
+                    android_material_icon_name="check_circle"
+                    size={24}
+                    color={colors.primary}
+                  />
+                )}
+              </Pressable>
+            ))}
+
+            <Button
+              onPress={() => setShowFinishActionModal(false)}
+              variant="outline"
+              style={styles.cancelButton}
+            >
+              Cancel
+            </Button>
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* File Type Selection Modal */}
       <Modal
@@ -1177,6 +1342,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface + "CC",
     color: colors.textPrimary,
   },
+  selectButton: {
+    height: 40,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+  },
+  selectButtonText: {
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
   helpText: {
     fontSize: 11,
     color: colors.textSecondary,
@@ -1232,10 +1412,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface + "CC",
     borderWidth: 1,
     borderColor: colors.accentBorder,
+    marginBottom: 12,
   },
   switchLabel: {
     flex: 1,
     marginRight: 12,
+  },
+  terrainSettingsContainer: {
+    marginLeft: 16,
+    paddingLeft: 16,
+    borderLeftWidth: 2,
+    borderLeftColor: colors.primary,
   },
   statsSection: {
     marginBottom: 20,
@@ -1319,6 +1506,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: 20,
     textAlign: "center",
+  },
+  finishActionOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundLight,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    gap: 12,
+  },
+  finishActionOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + "20",
+  },
+  finishActionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textPrimary,
+  },
+  finishActionTextSelected: {
+    color: colors.primary,
   },
   fileTypeOption: {
     flexDirection: "row",
