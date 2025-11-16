@@ -147,6 +147,23 @@ export default function HomeScreen() {
     );
   };
 
+  const handleFlightPlanning = () => {
+    console.log("[HomeScreen] 🛫 Navigating to Flight Planning...");
+    try {
+      router.push({
+        pathname: "/flight-planning",
+        params: {
+          projectId: "new",
+          projectName: "New Flight Plan",
+        },
+      });
+      console.log("[HomeScreen] ✅ Navigation initiated");
+    } catch (error) {
+      console.error("[HomeScreen] ❌ Navigation error:", error);
+      Alert.alert("Error", "Failed to open Flight Planning. Please try again.");
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.backgroundLight }]}>
@@ -326,16 +343,7 @@ export default function HomeScreen() {
             androidIcon="flight"
             title="Flight Planning"
             description="Plan autonomous drone missions"
-            onPress={() => {
-              Alert.alert(
-                "Flight Planning",
-                "Please select a project first",
-                [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Go to Projects", onPress: () => router.push("/projects") },
-                ]
-              );
-            }}
+            onPress={handleFlightPlanning}
             color={colors.primary}
           />
 
