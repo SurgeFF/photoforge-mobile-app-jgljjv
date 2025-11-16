@@ -112,7 +112,7 @@ export default function FloatingTabBar({
           const isActive = pathname === tab.route;
           return (
             <TouchableOpacity
-              key={index}
+              key={`tab-${tab.name}-${index}`}
               style={styles.tab}
               onPress={() => handleTabPress(tab.route)}
               activeOpacity={0.7}

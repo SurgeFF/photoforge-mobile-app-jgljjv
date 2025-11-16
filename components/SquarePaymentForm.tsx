@@ -11,13 +11,14 @@ import {
 import { colors } from "@/styles/commonStyles";
 import Button from "@/components/button";
 import { IconSymbol } from "@/components/IconSymbol";
-import { squarePayment, getAccessKey } from "@/utils/apiClient";
+import { squarePaymentMobile, getAccessKey } from "@/utils/apiClient";
 
 interface SquarePaymentFormProps {
   amount: number;
   paymentType: "donation" | "subscription";
   customerEmail?: string;
   customerName?: string;
+  message?: string;
   onSuccess: (result: any) => void;
   onError: (error: string) => void;
 }
@@ -27,6 +28,7 @@ export default function SquarePaymentForm({
   paymentType,
   customerEmail = "",
   customerName = "",
+  message = "",
   onSuccess,
   onError,
 }: SquarePaymentFormProps) {
@@ -34,6 +36,8 @@ export default function SquarePaymentForm({
   const [expiryDate, setExpiryDate] = useState("");
   const [cvv, setCvv] = useState("");
   const [zipCode, setZipCode] = useState("");
+  const [email, setEmail] = useState(customerEmail);
+  const [name, setName] = useState(customerName);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const formatCardNumber = (text: string) => {
@@ -82,6 +86,16 @@ export default function SquarePaymentForm({
       return false;
     }
 
+    if (!email || !email.includes("@")) {
+      Alert.alert("Invalid Email", "Please enter a valid email address");
+      return false;
+    }
+
+    if (!name || name.trim().length < 2) {
+      Alert.alert("Invalid Name", "Please enter your full name");
+      return false;
+    }
+
     return true;
   };
 
@@ -97,6 +111,7 @@ export default function SquarePaymentForm({
       if (!accessKey) {
         Alert.alert("Error", "Please login first");
         onError("Not authenticated");
+        setIsProcessing(false);
         return;
       }
 
@@ -108,7 +123,7 @@ export default function SquarePaymentForm({
       // For now, we'll show a message that Square integration needs to be completed
       Alert.alert(
         "Square Integration Required",
-        `To process ${paymentType === "subscription" ? "subscription" : "donation"} payments, the Square Web Payments SDK needs to be fully integrated.\n\nThis requires:\n\n1. Square Application ID\n2. Square Location ID\n3. Web Payments SDK initialization\n4. Card tokenization\n5. Backend payment processing\n\nThe payment details you entered would be tokenized by Square and sent securely to the backend.\n\nAmount: $${amount.toFixed(2)}\nType: ${paymentType}\n\nPlease contact the developer to complete the Square integration.`,
+        `To process ${paymentType === "subscription" ? "subscription" : "donation"} payments, the Square Web Payments SDK needs to be fully integrated.\n\nThis requires:\n\n1. Square Application ID\n2. Square Location ID\n3. Web Payments SDK initialization\n4. Card tokenization\n5. Backend payment processing\n\nThe payment details you entered would be tokenized by Square and sent securely to the backend using the squarePaymentMobile endpoint.\n\nRequest Format:\n{\n  "access_key": "your_key",\n  "payment_type": "${paymentType}",\n  "amount": ${amount.toFixed(2)},\n  "nonce": "square_nonce",\n  "idempotency_key": "unique_id",\n  "customer_email": "${email}",\n  "customer_name": "${name}",\n  "message": "${message || 'N/A'}"\n}\n\nPlease contact the developer to complete the Square integration.`,
         [
           {
             text: "OK",
@@ -118,6 +133,8 @@ export default function SquarePaymentForm({
                 payment_id: `demo_${Date.now()}`,
                 amount: amount,
                 type: paymentType,
+                receipt_url: "https://example.com/receipt",
+                message: "Demo payment successful",
               });
             },
           },
@@ -126,6 +143,7 @@ export default function SquarePaymentForm({
 
       // Actual implementation would look like:
       /*
+      // 1. Tokenize card with Square SDK
       const nonce = await tokenizeCard({
         cardNumber: cardNumber.replace(/\s/g, ""),
         expiryMonth: expiryDate.split("/")[0],
@@ -134,24 +152,46 @@ export default function SquarePaymentForm({
         postalCode: zipCode,
       });
 
-      const result = await squarePayment(accessKey, {
+      // 2. Call backend with nonce
+      const result = await squarePaymentMobile(accessKey, {
         payment_type: paymentType,
         amount: amount,
         nonce: nonce,
         idempotency_key: `${paymentType}_${Date.now()}_${Math.random().toString(36).substring(7)}`,
-        customer_email: customerEmail,
-        customer_name: customerName,
+        customer_email: email,
+        customer_name: name,
+        message: message,
       });
 
-      if (result.success) {
-        onSuccess(result.data);
+      if (result.success && result.data) {
+        // Show success message
+        Alert.alert(
+          "Payment Successful!",
+          `Your ${paymentType} payment of $${amount.toFixed(2)} has been processed.\n\nPayment ID: ${result.data.payment_id}\n\nA receipt has been sent to ${email}`,
+          [
+            {
+              text: "View Receipt",
+              onPress: () => {
+                // Open receipt URL
+                if (result.data.receipt_url) {
+                  Linking.openURL(result.data.receipt_url);
+                }
+              },
+            },
+            {
+              text: "OK",
+              onPress: () => onSuccess(result.data),
+            },
+          ]
+        );
       } else {
-        onError(result.error || "Payment failed");
+        throw new Error(result.error || "Payment failed");
       }
       */
     } catch (error) {
       console.error("Payment error:", error);
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      Alert.alert("Payment Failed", errorMessage);
       onError(errorMessage);
     } finally {
       setIsProcessing(false);
@@ -168,6 +208,31 @@ export default function SquarePaymentForm({
           color={colors.success}
         />
         <Text style={styles.securityText}>Secure Payment via Square</Text>
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Full Name</Text>
+        <TextInput
+          style={styles.inputFull}
+          placeholder="John Doe"
+          placeholderTextColor={colors.textSecondary}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Email Address</Text>
+        <TextInput
+          style={styles.inputFull}
+          placeholder="john@example.com"
+          placeholderTextColor={colors.textSecondary}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+        />
       </View>
 
       <View style={styles.formGroup}>

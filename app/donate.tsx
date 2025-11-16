@@ -1,5 +1,13 @@
 
 import React, { useState } from "react";
+import { useTheme } from "@react-navigation/native";
+import { colors } from "@/styles/commonStyles";
+import TopographicBackground from "@/components/TopographicBackground";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { IconSymbol } from "@/components/IconSymbol";
+import { router } from "expo-router";
+import Button from "@/components/button";
+import SquarePaymentForm from "@/components/SquarePaymentForm";
 import {
   View,
   Text,
@@ -11,50 +19,211 @@ import {
   Pressable,
   Modal,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useTheme } from "@react-navigation/native";
-import { router } from "expo-router";
-import { colors } from "@/styles/commonStyles";
-import { IconSymbol } from "@/components/IconSymbol";
-import TopographicBackground from "@/components/TopographicBackground";
-import Button from "@/components/button";
-import SquarePaymentForm from "@/components/SquarePaymentForm";
 
 const PRESET_AMOUNTS = [5, 10, 25, 50, 100];
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 24,
+    paddingBottom: 120,
+  },
+  header: {
+    marginBottom: 32,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 16,
+  },
+  backButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.primary,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: "800",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    lineHeight: 24,
+  },
+  section: {
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 16,
+  },
+  presetAmounts: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  presetButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "80",
+  },
+  presetButtonActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary + "20",
+  },
+  presetButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  presetButtonTextActive: {
+    color: colors.primary,
+  },
+  customAmountContainer: {
+    marginTop: 16,
+  },
+  customAmountLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  customAmountInput: {
+    height: 56,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    fontSize: 24,
+    fontWeight: "700",
+    borderWidth: 2,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+    color: colors.textPrimary,
+  },
+  messageContainer: {
+    marginTop: 16,
+  },
+  messageLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textPrimary,
+    marginBottom: 8,
+  },
+  messageInput: {
+    height: 100,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    borderWidth: 2,
+    borderColor: colors.accentBorder,
+    backgroundColor: colors.surface + "CC",
+    color: colors.textPrimary,
+    textAlignVertical: "top",
+  },
+  impactSection: {
+    padding: 20,
+    backgroundColor: colors.primary + "15",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.primary + "30",
+  },
+  impactTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+    marginBottom: 12,
+  },
+  impactItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    marginBottom: 8,
+  },
+  impactText: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.textPrimary,
+    lineHeight: 20,
+  },
+  donateButton: {
+    height: 56,
+  },
+  modal: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "90%",
+    maxWidth: 500,
+    backgroundColor: colors.backgroundWarm,
+    borderRadius: 24,
+    padding: 24,
+    maxHeight: "80%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: colors.textPrimary,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  modalScroll: {
+    maxHeight: 500,
+  },
+});
 
 export default function DonateScreen() {
   const theme = useTheme();
   const [selectedAmount, setSelectedAmount] = useState<number | null>(null);
   const [customAmount, setCustomAmount] = useState("");
-  const [donorName, setDonorName] = useState("");
-  const [donorEmail, setDonorEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [donationMessage, setDonationMessage] = useState("");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const handleDonate = () => {
     const amount = selectedAmount || parseFloat(customAmount);
-
-    if (!amount || amount <= 0 || isNaN(amount)) {
-      Alert.alert("Error", "Please enter a valid donation amount");
+    
+    if (!amount || amount <= 0) {
+      Alert.alert("Invalid Amount", "Please select or enter a donation amount");
       return;
     }
 
-    if (!donorEmail.trim()) {
-      Alert.alert("Error", "Please enter your email address");
+    if (amount < 1) {
+      Alert.alert("Minimum Amount", "Minimum donation amount is $1.00");
       return;
     }
 
-    setShowPaymentForm(true);
+    setShowPaymentModal(true);
   };
 
   const handlePaymentSuccess = (result: any) => {
-    setShowPaymentForm(false);
+    console.log("Payment successful:", result);
+    setShowPaymentModal(false);
+    
     Alert.alert(
-      "Thank You!",
-      `Your donation of $${selectedAmount || parseFloat(customAmount)} has been processed successfully.\n\nYou will receive a confirmation email shortly.`,
+      "Thank You! 🎉",
+      `Your donation of $${(selectedAmount || parseFloat(customAmount)).toFixed(2)} has been processed successfully!\n\nYour support helps us continue developing PhotoForge and providing the best drone photogrammetry tools.`,
       [
         {
-          text: "OK",
+          text: "Done",
           onPress: () => router.back(),
         },
       ]
@@ -62,7 +231,14 @@ export default function DonateScreen() {
   };
 
   const handlePaymentError = (error: string) => {
-    Alert.alert("Payment Failed", error);
+    console.error("Payment error:", error);
+    setShowPaymentModal(false);
+    
+    Alert.alert(
+      "Payment Failed",
+      `We couldn't process your donation: ${error}\n\nPlease try again or contact support if the problem persists.`,
+      [{ text: "OK" }]
+    );
   };
 
   const handleCustomAmountChange = (text: string) => {
@@ -75,399 +251,194 @@ export default function DonateScreen() {
       return;
     }
     
+    // Limit to 2 decimal places
+    if (parts[1] && parts[1].length > 2) {
+      return;
+    }
+    
     setCustomAmount(cleaned);
     setSelectedAmount(null);
   };
 
-  const currentAmount = selectedAmount || parseFloat(customAmount) || 0;
+  const finalAmount = selectedAmount || parseFloat(customAmount) || 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <TopographicBackground />
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.textPrimary}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle}>Support PhotoForge</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.iconContainer}>
-          <IconSymbol
-            ios_icon_name="heart.fill"
-            android_material_icon_name="favorite"
-            size={64}
-            color={colors.primaryDark}
-          />
-        </View>
-
-        <Text style={styles.title}>Support Our Mission</Text>
-        <Text style={styles.subtitle}>
-          Your donation helps us continue developing and improving PhotoForge for the drone mapping community.
-        </Text>
-
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Select Amount</Text>
-
-          <View style={styles.amountGrid}>
-            {PRESET_AMOUNTS.map((amount) => (
-              <Pressable
-                key={amount}
-                style={[
-                  styles.amountButton,
-                  selectedAmount === amount && styles.amountButtonActive,
-                ]}
-                onPress={() => {
-                  setSelectedAmount(amount);
-                  setCustomAmount("");
-                }}
-              >
-                <Text
-                  style={[
-                    styles.amountText,
-                    selectedAmount === amount && styles.amountTextActive,
-                  ]}
-                >
-                  ${amount}
-                </Text>
-              </Pressable>
-            ))}
+      <SafeAreaView style={{ flex: 1 }} edges={["top"]}>
+        <ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.header}>
+            <Pressable style={styles.backButton} onPress={() => router.back()}>
+              <IconSymbol
+                ios_icon_name="chevron.left"
+                android_material_icon_name="arrow-back"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={styles.backButtonText}>Back</Text>
+            </Pressable>
+            
+            <Text style={styles.title}>Support PhotoForge</Text>
+            <Text style={styles.subtitle}>
+              Your donation helps us continue developing cutting-edge drone photogrammetry tools and maintaining our services.
+            </Text>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Custom Amount</Text>
-            <View style={styles.currencyInput}>
-              <Text style={styles.currencySymbol}>$</Text>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Select Amount</Text>
+            <View style={styles.presetAmounts}>
+              {PRESET_AMOUNTS.map((amount) => (
+                <Pressable
+                  key={amount}
+                  style={[
+                    styles.presetButton,
+                    selectedAmount === amount && styles.presetButtonActive,
+                  ]}
+                  onPress={() => {
+                    setSelectedAmount(amount);
+                    setCustomAmount("");
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.presetButtonText,
+                      selectedAmount === amount && styles.presetButtonTextActive,
+                    ]}
+                  >
+                    ${amount}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.customAmountContainer}>
+              <Text style={styles.customAmountLabel}>Or enter custom amount</Text>
               <TextInput
-                style={styles.input}
-                placeholder="0.00"
+                style={styles.customAmountInput}
+                placeholder="$0.00"
                 placeholderTextColor={colors.textSecondary}
                 value={customAmount}
                 onChangeText={handleCustomAmountChange}
                 keyboardType="decimal-pad"
               />
             </View>
-          </View>
-        </View>
 
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Your Information</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Name (Optional)</Text>
-            <TextInput
-              style={styles.inputFull}
-              placeholder="John Doe"
-              placeholderTextColor={colors.textSecondary}
-              value={donorName}
-              onChangeText={setDonorName}
-            />
+            <View style={styles.messageContainer}>
+              <Text style={styles.messageLabel}>Add a message (optional)</Text>
+              <TextInput
+                style={styles.messageInput}
+                placeholder="Leave a message with your donation..."
+                placeholderTextColor={colors.textSecondary}
+                value={donationMessage}
+                onChangeText={setDonationMessage}
+                multiline
+                maxLength={500}
+              />
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email *</Text>
-            <TextInput
-              style={styles.inputFull}
-              placeholder="your@email.com"
-              placeholderTextColor={colors.textSecondary}
-              value={donorEmail}
-              onChangeText={setDonorEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
+          <View style={styles.section}>
+            <View style={styles.impactSection}>
+              <Text style={styles.impactTitle}>Your Impact</Text>
+              <View style={styles.impactItem}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.impactText}>
+                  Support ongoing development of new features
+                </Text>
+              </View>
+              <View style={styles.impactItem}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.impactText}>
+                  Help maintain and improve server infrastructure
+                </Text>
+              </View>
+              <View style={styles.impactItem}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.impactText}>
+                  Enable better customer support and documentation
+                </Text>
+              </View>
+              <View style={styles.impactItem}>
+                <IconSymbol
+                  ios_icon_name="checkmark.circle.fill"
+                  android_material_icon_name="check-circle"
+                  size={20}
+                  color={colors.primary}
+                />
+                <Text style={styles.impactText}>
+                  Keep PhotoForge accessible to everyone
+                </Text>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Message (Optional)</Text>
-            <TextInput
-              style={[styles.inputFull, styles.textArea]}
-              placeholder="Leave a message..."
-              placeholderTextColor={colors.textSecondary}
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={4}
-            />
-          </View>
-        </View>
-
-        <View style={styles.infoBox}>
-          <IconSymbol
-            ios_icon_name="lock.shield.fill"
-            android_material_icon_name="security"
-            size={24}
-            color={colors.primary}
-          />
-          <View style={styles.infoContent}>
-            <Text style={styles.infoTitle}>Secure Payment via Square</Text>
-            <Text style={styles.infoText}>
-              All donations are processed securely through Square. Your payment information is encrypted and never stored on our servers.
-            </Text>
-          </View>
-        </View>
-
-        <Button
-          onPress={handleDonate}
-          style={styles.donateButton}
-        >
-          Continue to Payment
-        </Button>
-
-        <Text style={styles.disclaimer}>
-          By donating, you agree to our terms of service. Donations are non-refundable.
-        </Text>
-      </ScrollView>
+          <Button
+            onPress={handleDonate}
+            style={styles.donateButton}
+            disabled={finalAmount <= 0}
+          >
+            {finalAmount > 0 ? `Donate $${finalAmount.toFixed(2)}` : "Select Amount"}
+          </Button>
+        </ScrollView>
+      </SafeAreaView>
 
       <Modal
-        visible={showPaymentForm}
+        visible={showPaymentModal}
         animationType="slide"
-        presentationStyle="pageSheet"
-        onRequestClose={() => setShowPaymentForm(false)}
+        transparent={true}
+        onRequestClose={() => setShowPaymentModal(false)}
       >
-        <SafeAreaView style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Pressable
-              onPress={() => setShowPaymentForm(false)}
-              style={styles.backButton}
-            >
-              <IconSymbol
-                ios_icon_name="chevron.left"
-                android_material_icon_name="arrow-back"
-                size={24}
-                color={colors.textPrimary}
-              />
-            </Pressable>
-            <Text style={styles.modalTitle}>Payment Details</Text>
-            <View style={styles.placeholder} />
-          </View>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Complete Donation</Text>
+              <Pressable
+                style={styles.closeButton}
+                onPress={() => setShowPaymentModal(false)}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+            </View>
 
-          <ScrollView
-            style={styles.modalScrollView}
-            contentContainerStyle={styles.modalContent}
-          >
-            <SquarePaymentForm
-              amount={currentAmount}
-              paymentType="donation"
-              customerEmail={donorEmail}
-              customerName={donorName}
-              onSuccess={handlePaymentSuccess}
-              onError={handlePaymentError}
-            />
-          </ScrollView>
-        </SafeAreaView>
+            <ScrollView 
+              style={styles.modalScroll}
+              showsVerticalScrollIndicator={false}
+            >
+              <SquarePaymentForm
+                amount={finalAmount}
+                paymentType="donation"
+                message={donationMessage}
+                onSuccess={handlePaymentSuccess}
+                onError={handlePaymentError}
+              />
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.backgroundLight,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    paddingTop: Platform.OS === "android" ? 48 : 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    flex: 1,
-    textAlign: "center",
-  },
-  placeholder: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  content: {
-    padding: 24,
-    paddingBottom: 120,
-  },
-  iconContainer: {
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "800",
-    color: colors.textPrimary,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginBottom: 32,
-    lineHeight: 24,
-  },
-  formSection: {
-    marginBottom: 32,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 16,
-  },
-  amountGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 20,
-  },
-  amountButton: {
-    flex: 1,
-    minWidth: "30%",
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    backgroundColor: colors.surface + "CC",
-    borderWidth: 2,
-    borderColor: colors.accentBorder,
-    alignItems: "center",
-  },
-  amountButtonActive: {
-    backgroundColor: colors.primaryDark + "20",
-    borderColor: colors.primaryDark,
-  },
-  amountText: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textSecondary,
-  },
-  amountTextActive: {
-    color: colors.primaryDark,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.textPrimary,
-    marginBottom: 8,
-  },
-  currencyInput: {
-    flexDirection: "row",
-    alignItems: "center",
-    height: 56,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-  },
-  currencySymbol: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginRight: 8,
-  },
-  input: {
-    flex: 1,
-    fontSize: 20,
-    fontWeight: "600",
-    color: colors.textPrimary,
-  },
-  inputFull: {
-    height: 48,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-    color: colors.textPrimary,
-  },
-  textArea: {
-    height: 100,
-    paddingTop: 12,
-    textAlignVertical: "top",
-  },
-  infoBox: {
-    flexDirection: "row",
-    padding: 16,
-    backgroundColor: colors.primary + "20",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    marginBottom: 24,
-    gap: 12,
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginBottom: 4,
-  },
-  infoText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    lineHeight: 20,
-  },
-  donateButton: {
-    marginTop: 16,
-    height: 56,
-  },
-  disclaimer: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    textAlign: "center",
-    marginTop: 16,
-    lineHeight: 18,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: colors.backgroundLight,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.accentBorder,
-    backgroundColor: colors.surface + "CC",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    flex: 1,
-    textAlign: "center",
-  },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalContent: {
-    padding: 24,
-    paddingBottom: 120,
-  },
-});

@@ -464,28 +464,45 @@ export async function createProject(accessKey: string, project: any): Promise<Ap
 }
 
 /**
- * Get media files for a project (legacy method)
+ * Get media files for a project
+ * FIXED: Now uses mobile endpoint with access_key
  */
 export async function getMediaFiles(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
   try {
+    console.log("\n========== FETCHING MEDIA FILES (MOBILE) ==========");
     console.log("📷 Fetching media files for project:", projectId);
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/getMediaFilesMobile`);
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
     
-    const response = await fetch(`${ENTITIES_BASE}/MediaFile?project_id=${projectId}`, {
-      method: "GET",
+    const response = await fetch(`${FUNCTIONS_BASE}/getMediaFilesMobile`, {
+      method: "POST",
       headers: {
-        "Authorization": `Bearer ${accessKey}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        access_key: accessKey,
+        project_id: projectId,
+      }),
     });
 
-    if (response.ok) {
-      const mediaFiles = await response.json();
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response data:", JSON.stringify(data).substring(0, 200) + "...");
+
+    if (response.ok && data.success) {
+      const mediaFiles = data.data || [];
       console.log("✅ Media files loaded:", mediaFiles.length);
+      console.log("========== FETCH MEDIA FILES SUCCESS ==========\n");
       return { success: true, data: mediaFiles };
     } else {
-      return { success: false, error: "Failed to load media files" };
+      const errorMsg = data.error || "Failed to load media files";
+      console.log("❌ Failed to load media files:", errorMsg);
+      console.log("========== FETCH MEDIA FILES FAILED ==========\n");
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
-    console.error("❌ Get media files error:", error);
+    console.error("❌ EXCEPTION during getMediaFiles:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
@@ -494,28 +511,45 @@ export async function getMediaFiles(accessKey: string, projectId: string): Promi
 }
 
 /**
- * Get processed models for a project (legacy method)
+ * Get processed models for a project
+ * FIXED: Now uses mobile endpoint with access_key
  */
 export async function getProcessedModels(accessKey: string, projectId: string): Promise<ApiResponse<any[]>> {
   try {
+    console.log("\n========== FETCHING PROCESSED MODELS (MOBILE) ==========");
     console.log("🎨 Fetching processed models for project:", projectId);
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/getProcessedModelsMobile`);
+    console.log("🔐 Access key (first 10 chars):", accessKey.substring(0, 10) + "...");
     
-    const response = await fetch(`${ENTITIES_BASE}/ProcessedModel?project_id=${projectId}`, {
-      method: "GET",
+    const response = await fetch(`${FUNCTIONS_BASE}/getProcessedModelsMobile`, {
+      method: "POST",
       headers: {
-        "Authorization": `Bearer ${accessKey}`,
+        "Content-Type": "application/json",
       },
+      body: JSON.stringify({
+        access_key: accessKey,
+        project_id: projectId,
+      }),
     });
 
-    if (response.ok) {
-      const models = await response.json();
+    console.log("📊 Status:", response.status, response.statusText);
+    
+    const data = await response.json();
+    console.log("📄 Response data:", JSON.stringify(data).substring(0, 200) + "...");
+
+    if (response.ok && data.success) {
+      const models = data.data || [];
       console.log("✅ Processed models loaded:", models.length);
+      console.log("========== FETCH PROCESSED MODELS SUCCESS ==========\n");
       return { success: true, data: models };
     } else {
-      return { success: false, error: "Failed to load processed models" };
+      const errorMsg = data.error || "Failed to load processed models";
+      console.log("❌ Failed to load processed models:", errorMsg);
+      console.log("========== FETCH PROCESSED MODELS FAILED ==========\n");
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
-    console.error("❌ Get processed models error:", error);
+    console.error("❌ EXCEPTION during getProcessedModels:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
@@ -1227,9 +1261,8 @@ export async function checkSubscription(accessKey: string): Promise<ApiResponse<
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessKey}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ access_key: accessKey }),
     });
 
     const data = await response.json();
@@ -1250,42 +1283,76 @@ export async function checkSubscription(accessKey: string): Promise<ApiResponse<
 }
 
 /**
- * Process payment via Square
+ * Process payment via Square (Mobile)
+ * UPDATED: Now uses squarePaymentMobile endpoint with proper request format
  * For subscriptions: amount should be 5 (for $5/month)
  * For donations: amount is user-specified
  */
-export async function squarePayment(accessKey: string, params: {
+export async function squarePaymentMobile(accessKey: string, params: {
   payment_type: "donation" | "subscription";
   amount: number;
   nonce: string;
   idempotency_key: string;
   customer_email?: string;
   customer_name?: string;
+  message?: string;
 }): Promise<ApiResponse<any>> {
   try {
-    console.log("💰 Processing Square payment...");
+    console.log("\n========== PROCESSING SQUARE PAYMENT (MOBILE) ==========");
+    console.log("💰 Processing Square payment via mobile endpoint...");
+    console.log("📍 Endpoint:", `${FUNCTIONS_BASE}/squarePaymentMobile`);
     console.log("   - Type:", params.payment_type);
     console.log("   - Amount: $", params.amount);
+    console.log("   - Customer:", params.customer_name || "N/A");
+    console.log("   - Email:", params.customer_email || "N/A");
     
-    const response = await fetch(`${FUNCTIONS_BASE}/squarePayment`, {
+    const response = await fetch(`${FUNCTIONS_BASE}/squarePaymentMobile`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessKey}`,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        access_key: accessKey,
+        payment_type: params.payment_type,
+        amount: params.amount,
+        nonce: params.nonce,
+        idempotency_key: params.idempotency_key,
+        customer_email: params.customer_email,
+        customer_name: params.customer_name,
+        message: params.message,
+      }),
     });
 
+    console.log("📊 Status:", response.status, response.statusText);
+    
     const data = await response.json();
+    console.log("📄 Response:", JSON.stringify(data).substring(0, 200) + "...");
     
     if (response.ok && data.success) {
       console.log("✅ Payment processed successfully");
-      return { success: true, data };
+      console.log("   - Payment ID:", data.payment_id);
+      console.log("   - Receipt URL:", data.receipt_url);
+      console.log("========== PAYMENT SUCCESS ==========\n");
+      return { 
+        success: true, 
+        data: {
+          payment_id: data.payment_id,
+          receipt_url: data.receipt_url,
+          message: data.message,
+          payment_record_id: data.data?.payment_record_id,
+          amount: data.data?.amount,
+          card_brand: data.data?.card_brand,
+          last_4: data.data?.last_4,
+        }
+      };
     } else {
-      return { success: false, error: data.error || "Payment failed" };
+      const errorMsg = data.error || data.message || "Payment failed";
+      console.log("❌ Payment failed:", errorMsg);
+      console.log("========== PAYMENT FAILED ==========\n");
+      return { success: false, error: errorMsg };
     }
   } catch (error) {
-    console.error("❌ Square payment error:", error);
+    console.error("❌ EXCEPTION during squarePaymentMobile:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Network error",
@@ -1305,9 +1372,8 @@ export async function checkPaymentNotifications(accessKey: string): Promise<ApiR
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessKey}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ access_key: accessKey }),
     });
 
     const data = await response.json();
@@ -1338,9 +1404,8 @@ export async function testSquareCredentials(accessKey: string): Promise<ApiRespo
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessKey}`,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ access_key: accessKey }),
     });
 
     const data = await response.json();
@@ -1377,9 +1442,11 @@ export async function submitSupportTicket(accessKey: string, params: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${accessKey}`,
       },
-      body: JSON.stringify(params),
+      body: JSON.stringify({
+        access_key: accessKey,
+        ...params,
+      }),
     });
 
     const data = await response.json();
