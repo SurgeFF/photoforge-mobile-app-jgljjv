@@ -73,6 +73,22 @@ export default function ProjectDetailScreen() {
     }
   };
 
+  const handleFlightPlanning = () => {
+    console.log("🛫 Navigating to flight planning with:", { projectId, projectName });
+    try {
+      router.push({
+        pathname: "/flight-planning",
+        params: { 
+          projectId: projectId || "unknown",
+          projectName: projectName || "Unnamed Project"
+        },
+      });
+    } catch (error) {
+      console.error("❌ Navigation error:", error);
+      Alert.alert("Error", "Failed to navigate to flight planning");
+    }
+  };
+
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -174,12 +190,7 @@ export default function ProjectDetailScreen() {
           </Button>
 
           <Button
-            onPress={() => {
-              router.push({
-                pathname: "/flight-planning",
-                params: { projectId, projectName },
-              });
-            }}
+            onPress={handleFlightPlanning}
             style={styles.actionButton}
           >
             <View style={styles.buttonContent}>
@@ -189,7 +200,7 @@ export default function ProjectDetailScreen() {
                 size={24}
                 color={colors.surface}
               />
-              <Text style={styles.buttonText}>Plan Flight</Text>
+              <Text style={styles.buttonText}>Flight Planning</Text>
             </View>
           </Button>
 
