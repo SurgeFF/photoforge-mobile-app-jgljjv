@@ -365,25 +365,22 @@ export default function AutodeskSettingsScreen() {
         // Start polling for status
         setProcessingModelId(result.data.model_id);
         
-        Alert.alert(
-          "Processing Started! 🚀",
-          `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nYou will be redirected to the project page.`,
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                // Navigate back to project detail page
-                router.push({
-                  pathname: "/project-detail",
-                  params: {
-                    projectId: selectedProjectId,
-                    projectName: selectedProjectName,
-                  },
-                });
-              },
-            },
-          ]
-        );
+        // Navigate back to project detail page immediately
+        router.push({
+          pathname: "/project-detail",
+          params: {
+            projectId: selectedProjectId,
+            projectName: selectedProjectName,
+          },
+        });
+
+        // Show success alert after navigation
+        setTimeout(() => {
+          Alert.alert(
+            "Processing Started! 🚀",
+            `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nYou can monitor the progress on the project page.`
+          );
+        }, 500);
       } else {
         Alert.alert("Error", result.error || "Failed to start processing");
       }

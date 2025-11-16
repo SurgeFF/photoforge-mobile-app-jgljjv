@@ -446,12 +446,24 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Processing Status Section */}
+        {/* Processing Status Section - Above Quick Actions */}
         {processingProjects.length > 0 && (
           <View style={styles.processingSection}>
-            <Text style={styles.sectionTitle}>Processing</Text>
+            <Text style={styles.sectionTitle}>3D Processing Status</Text>
             {processingProjects.map((project, index) => (
-              <View key={index} style={styles.processingCard}>
+              <Pressable
+                key={index}
+                style={styles.processingCard}
+                onPress={() => {
+                  router.push({
+                    pathname: "/project-detail",
+                    params: {
+                      projectId: project.id,
+                      projectName: project.name,
+                    },
+                  });
+                }}
+              >
                 <View style={styles.processingHeader}>
                   <View style={styles.processingTitleRow}>
                     <IconSymbol
@@ -484,7 +496,17 @@ export default function HomeScreen() {
                     {project.message}
                   </Text>
                 )}
-              </View>
+
+                <View style={styles.processingFooter}>
+                  <Text style={styles.processingFooterText}>Tap to view details</Text>
+                  <IconSymbol
+                    ios_icon_name="chevron.right"
+                    android_material_icon_name="chevron_right"
+                    size={16}
+                    color={colors.textSecondary}
+                  />
+                </View>
+              </Pressable>
             ))}
           </View>
         )}
@@ -809,6 +831,19 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   processingMessage: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: "italic",
+    marginBottom: 8,
+  },
+  processingFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 4,
+    marginTop: 4,
+  },
+  processingFooterText: {
     fontSize: 12,
     color: colors.textSecondary,
     fontStyle: "italic",

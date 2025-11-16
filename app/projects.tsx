@@ -308,7 +308,7 @@ export default function ProjectsScreen() {
             color={colors.textPrimary}
           />
         </Pressable>
-        <Text style={styles.headerTitle}>My Projects</Text>
+        <Text style={styles.headerTitle}>Projects</Text>
         <Pressable onPress={() => router.push("/new-project")} style={styles.addButton}>
           <IconSymbol
             ios_icon_name="plus"

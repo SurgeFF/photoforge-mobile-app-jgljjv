@@ -36,6 +36,7 @@ export default function ProjectDetailScreen() {
   const [mediaFiles, setMediaFiles] = useState<any[]>([]);
   const [models, setModels] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(true); // TODO: Get from API
   
   // Processing status polling
   const [processingStatus, setProcessingStatus] = useState<any>(null);
@@ -162,6 +163,17 @@ export default function ProjectDetailScreen() {
       console.error("❌ Navigation error:", error);
       Alert.alert("Error", "Failed to navigate to flight planning");
     }
+  };
+
+  const handleTeamManagement = () => {
+    router.push({
+      pathname: "/project-team",
+      params: {
+        projectId,
+        projectName,
+        isAdmin: isAdmin.toString(),
+      },
+    });
   };
 
   const handleDownloadModel = (model: any, type: string) => {
@@ -385,7 +397,7 @@ export default function ProjectDetailScreen() {
           />
         </Pressable>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          {projectName || "Project Details"}
+          Project Details
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -498,7 +510,22 @@ export default function ProjectDetailScreen() {
         )}
 
         <View style={styles.actionsSection}>
-          <Text style={styles.sectionTitle}>Actions</Text>
+          <Text style={styles.sectionTitle}>Quick Actions</Text>
+
+          <Button
+            onPress={handleTeamManagement}
+            style={styles.actionButton}
+          >
+            <View style={styles.buttonContent}>
+              <IconSymbol
+                ios_icon_name="person.3.fill"
+                android_material_icon_name="groups"
+                size={24}
+                color={colors.surface}
+              />
+              <Text style={styles.buttonText}>Team Members</Text>
+            </View>
+          </Button>
 
           <Button
             onPress={() => {
