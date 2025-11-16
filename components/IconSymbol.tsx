@@ -1,3 +1,4 @@
+
 // This file is a fallback for using MaterialIcons on Android and web.
 
 import React from "react";
@@ -29,11 +30,14 @@ export function IconSymbol({
   style?: StyleProp<ViewStyle>;
   weight?: SymbolWeight;
 }) {
+  // Ensure we have a valid Material Icon name
+  const iconName = android_material_icon_name || "help_outline";
+  
   return (
     <MaterialIcons
       color={color}
       size={size}
-      name={android_material_icon_name}
+      name={iconName}
       style={style as StyleProp<TextStyle>}
     />
   );
