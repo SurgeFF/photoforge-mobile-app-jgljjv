@@ -17,7 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.DroneElite.PhotoForge",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        ITSAppUsesNonExemptEncryption: false
       }
     },
     "android": {
@@ -43,6 +43,5 @@
     "extra": {
       "router": {}
     }
-  },
-  "scheme": "PhotoForge Mobile"
+  }
 }
