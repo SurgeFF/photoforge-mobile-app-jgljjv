@@ -1,6 +1,23 @@
 
 import * as amplitude from '@amplitude/analytics-react-native';
-import analytics from '@react-native-firebase/analytics';
+import { Platform } from 'react-native';
+
+// Dynamically import Firebase Analytics only if available
+let analytics: any = null;
+let firebaseAvailable = false;
+
+// Try to load Firebase Analytics
+try {
+  if (Platform.OS !== 'web') {
+    analytics = require('@react-native-firebase/analytics').default;
+    firebaseAvailable = true;
+    console.log('✅ Firebase Analytics module loaded');
+  }
+} catch (error) {
+  console.log('⚠️ Firebase Analytics not available (preview mode or not configured)');
+  firebaseAvailable = false;
+}
+
 import { initializeCrashlytics, setUserId as setCrashlyticsUserId, setAttribute } from './crashlytics';
 
 // Initialize analytics services
@@ -21,8 +38,12 @@ export const initializeAnalytics = async (amplitudeApiKey?: string) => {
       console.log('⚠️ Amplitude API key not provided, skipping initialization');
     }
 
-    // Firebase Analytics is automatically initialized with the app
-    console.log('✅ Firebase Analytics ready');
+    // Firebase Analytics is automatically initialized with the app (if available)
+    if (firebaseAvailable) {
+      console.log('✅ Firebase Analytics ready');
+    } else {
+      console.log('⚠️ Firebase Analytics not available - running in preview mode');
+    }
 
     // Initialize Crashlytics
     await initializeCrashlytics();
@@ -36,11 +57,13 @@ export const initializeAnalytics = async (amplitudeApiKey?: string) => {
 // Track screen views
 export const trackScreenView = async (screenName: string, screenClass?: string) => {
   try {
-    // Firebase Analytics
-    await analytics().logScreenView({
-      screen_name: screenName,
-      screen_class: screenClass || screenName,
-    });
+    // Firebase Analytics (only if available)
+    if (firebaseAvailable && analytics) {
+      await analytics().logScreenView({
+        screen_name: screenName,
+        screen_class: screenClass || screenName,
+      });
+    }
 
     // Amplitude
     amplitude.track('Screen View', {
@@ -57,8 +80,10 @@ export const trackScreenView = async (screenName: string, screenClass?: string) 
 // Track custom events
 export const trackEvent = async (eventName: string, properties?: Record<string, any>) => {
   try {
-    // Firebase Analytics
-    await analytics().logEvent(eventName, properties);
+    // Firebase Analytics (only if available)
+    if (firebaseAvailable && analytics) {
+      await analytics().logEvent(eventName, properties);
+    }
 
     // Amplitude
     amplitude.track(eventName, properties);
@@ -72,14 +97,17 @@ export const trackEvent = async (eventName: string, properties?: Record<string, 
 // Track user login
 export const trackLogin = async (method: string, userId?: string) => {
   try {
-    // Firebase Analytics
-    await analytics().logLogin({ method });
+    // Firebase Analytics (only if available)
+    if (firebaseAvailable && analytics) {
+      await analytics().logLogin({ method });
+      if (userId) {
+        await analytics().setUserId(userId);
+      }
+    }
 
     // Amplitude
     amplitude.track('Login', { method });
-
     if (userId) {
-      await analytics().setUserId(userId);
       amplitude.setUserId(userId);
       // Set user ID in Crashlytics as well
       setCrashlyticsUserId(userId);
@@ -94,14 +122,14 @@ export const trackLogin = async (method: string, userId?: string) => {
 // Track user logout
 export const trackLogout = async () => {
   try {
-    // Firebase Analytics
-    await analytics().logEvent('logout');
+    // Firebase Analytics (only if available)
+    if (firebaseAvailable && analytics) {
+      await analytics().logEvent('logout');
+      await analytics().setUserId(null);
+    }
 
     // Amplitude
     amplitude.track('Logout');
-
-    // Reset user ID
-    await analytics().setUserId(null);
     amplitude.reset();
 
     console.log('📊 Logout tracked');
@@ -176,7 +204,7 @@ export const trackProcessingStarted = async (projectId: string, imageCount: numb
 // Track payment
 export const trackPayment = async (paymentType: string, amount: number, success: boolean) => {
   try {
-    if (success) {
+    if (success && firebaseAvailable && analytics) {
       await analytics().logPurchase({
         value: amount,
         currency: 'USD',
@@ -209,8 +237,10 @@ export const trackSupportTicket = async (category: string, priority: string) => 
 // Set user properties
 export const setUserProperties = async (properties: Record<string, any>) => {
   try {
-    // Firebase Analytics
-    await analytics().setUserProperties(properties);
+    // Firebase Analytics (only if available)
+    if (firebaseAvailable && analytics) {
+      await analytics().setUserProperties(properties);
+    }
 
     // Amplitude
     const identify = new amplitude.Identify();
