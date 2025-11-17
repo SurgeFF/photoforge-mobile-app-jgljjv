@@ -14,6 +14,22 @@ config.cacheStores = [
 config.resolver = {
   ...config.resolver,
   unstable_enablePackageExports: true,
+  // Ensure proper resolution of node_modules
+  nodeModulesPaths: [path.resolve(__dirname, 'node_modules')],
 };
+
+// Optimize transformer for better performance
+config.transformer = {
+  ...config.transformer,
+  minifierPath: 'metro-minify-terser',
+  minifierConfig: {
+    compress: {
+      drop_console: false,
+    },
+  },
+};
+
+// Increase max workers for better build performance
+config.maxWorkers = 2;
 
 module.exports = config;

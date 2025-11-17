@@ -1,3 +1,4 @@
+
 module.exports = function (api) {
   api.cache(true);
 
@@ -11,7 +12,9 @@ module.exports = function (api) {
       : [];
 
   return {
-    presets: ["babel-preset-expo"],
+    presets: [
+      ["babel-preset-expo", { jsxRuntime: "automatic" }]
+    ],
     plugins: [
       [
         "module-resolver",
@@ -40,7 +43,7 @@ module.exports = function (api) {
       ],
       ...EDITABLE_COMPONENTS,
       "@babel/plugin-proposal-export-namespace-from",
-      "react-native-worklets/plugin", // react-native-worklets/plugin must be listed last!
+      "react-native-reanimated/plugin",
     ],
   };
 };

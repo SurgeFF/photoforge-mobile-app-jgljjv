@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.DroneElite.photoforgemobile'
+    namespace 'com.DroneElite.PhotoForge'
     defaultConfig {
-        applicationId 'com.DroneElite.photoforgemobile'
+        applicationId 'com.DroneElite.PhotoForge'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

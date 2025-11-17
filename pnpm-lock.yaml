@@ -5,7 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@expo/prebuild-config': latest
   '@react-native-async-storage/async-storage': 2.2.0
 
 importers:
@@ -66,9 +65,6 @@ importers:
       difflib:
         specifier: ^0.2.4
         version: 0.2.4
-      eas:
-        specifier: ^0.1.0
-        version: 0.1.0
       expo:
         specifier: ~54.0.1
         version: 54.0.23(@babel/core@7.28.5)(@expo/metro-runtime@6.1.2)(expo-router@6.0.14)(react-native-webview@13.16.0(react-native@0.81.4(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0))(react-native@0.81.4(@babel/core@7.28.5)(@types/react@19.1.17)(react@19.1.0))(react@19.1.0)
@@ -3122,10 +3118,6 @@ packages:
 
   duplexer3@0.1.5:
     resolution: {integrity: sha512-1A8za6ws41LQgv9HrE/66jyC5yuSjQ3L/KOpFtoBilsAK2iA2wuS5rTt1OCzIvtS2V7nVmedsUU+DGRcjBmOYA==}
-
-  eas@0.1.0:
-    resolution: {integrity: sha512-w88fTTTkfDLHwcaVW8wiYjOtnBBToguzc6AyIldD1vOrCRTKxhQEDS8oIE7nWeSJ+kCoIeoHd79Mhwvntydixg==}
-    engines: {node: '>=0.10.0'}
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
@@ -10137,8 +10129,6 @@ snapshots:
       gopd: 1.2.0
 
   duplexer3@0.1.5: {}
-
-  eas@0.1.0: {}
 
   eastasianwidth@0.2.0: {}
 

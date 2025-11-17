@@ -1,4 +1,4 @@
-package com.DroneElite.photoforgemobile
+package com.DroneElite.PhotoForge
 
 import android.app.Application
 import android.content.res.Configuration

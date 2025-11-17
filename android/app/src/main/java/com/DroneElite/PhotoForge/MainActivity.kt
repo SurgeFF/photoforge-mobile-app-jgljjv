@@ -1,4 +1,4 @@
-package com.DroneElite.photoforgemobile
+package com.DroneElite.PhotoForge
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
