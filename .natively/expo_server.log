@@ -24655,3 +24655,18 @@ Web Bundled 68ms index.ts (1 module)
 2025-11-17T18:39:03.249Z expo:start:server:metro:router Using app as the root directory for Expo Router.
 2025-11-17T18:39:05.351Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
 2025-11-17T18:39:05.352Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T18:39:07.463Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T18:39:07.463Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T18:39:09.584Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T18:39:09.584Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T18:39:11.679Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T18:39:11.680Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T18:39:13.577Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T18:39:13.578Z expo:start:server:urlCreator URL: 7hfgy6c-anonymous-8081.exp.direct
+2025-11-17T18:39:13.578Z expo:start:server:urlCreator URL: 7hfgy6c-anonymous-8081.exp.direct
+2025-11-17T18:39:13.578Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T18:39:13.578Z expo:start:server:urlCreator URL: http://7hfgy6c-anonymous-8081.exp.direct
+2025-11-17T18:39:13.588Z expo:start:server:middleware:resolveRuntimeVersion Using expo-updates runtimeversion:resolve CLI for runtime version resolution
+2025-11-17T18:39:13.596Z expo:codesigning WARN: Expo Application Services (EAS) is not configured for your project. Configuring EAS enables a more secure development experience amongst many other benefits. Learn more: https://docs.expo.dev/eas/
+2025-11-17T18:39:13.786Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T18:39:13.787Z expo:start:server:metro:router Using app as the root directory for Expo Router.
