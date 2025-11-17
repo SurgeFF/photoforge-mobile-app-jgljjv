@@ -21710,3 +21710,63 @@ Web Bundling failed 217ms index.ts (1 module)
 2025-11-17T17:53:38.229Z expo:start:server:metro:router Using app as the root directory for Expo Router.
 2025-11-17T17:53:40.333Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
 2025-11-17T17:53:40.333Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+ LOG  📂 Loading projects from mobile endpoint...
+ LOG  
+========== FETCHING PROJECTS (MOBILE) ==========
+ LOG  📂 Fetching all projects for mobile user...
+ LOG  📍 Endpoint: https://photoforge.base44.app/api/functions/getProjectsMobile
+ LOG  🔐 Access key (first 10 chars): wqrkJMKYwt...
+2025-11-17T17:53:42.461Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T17:53:42.462Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+ LOG  📊 Status: 200 
+ LOG  📄 Response data: {"success":true,"data":[{"name":"House TEst","description":"","location":"Colorado United States","flight_date":"","area_size":null,"status":"completed","drone_model":"","altitude":null,"overlap":null...
+ LOG  ✅ Projects loaded successfully: 2 projects
+ LOG  ========== FETCH PROJECTS SUCCESS ==========
+ LOG  ✅ Projects loaded: 2
+ LOG  
+========== FETCHING PROCESSED MODELS (MOBILE) ==========
+ LOG  🎨 Fetching processed models for project: 6902c85ca632191d30cf530b
+ LOG  📍 Endpoint: https://photoforge.base44.app/api/functions/getProcessedModelsMobile
+ LOG  🔐 Access key (first 10 chars): wqrkJMKYwt...
+ LOG  
+========== FETCHING PROCESSED MODELS (MOBILE) ==========
+ LOG  🎨 Fetching processed models for project: 69052d986a7b98fee9bdb779
+ LOG  📍 Endpoint: https://photoforge.base44.app/api/functions/getProcessedModelsMobile
+ LOG  🔐 Access key (first 10 chars): wqrkJMKYwt...
+ WARN  [IconSymbol] Invalid Material Icon name: location_on, using help-outline as fallback
+ WARN  [IconSymbol] Invalid Material Icon name: location_on, using help-outline as fallback
+ LOG  📊 Status: 200 
+ LOG  📄 Response data: {"success":true,"data":[{"project_id":"69052d986a7b98fee9bdb779","model_name":"DA3S Mapping 2","model_type":"photogrammetry","status":"completed","output_url":"https://adsk-rc-photofly-prod.s3.amazona...
+ LOG  ✅ Processed models loaded: 1
+ LOG  ========== FETCH PROCESSED MODELS SUCCESS ==========
+ LOG  📊 Status: 200 
+ LOG  📄 Response data: {"success":true,"data":[{"project_id":"6902c85ca632191d30cf530b","model_name":"House TEst","model_type":"photogrammetry","status":"completed","output_url":"https://adsk-rc-photofly-prod.s3.amazonaws.c...
+ LOG  ✅ Processed models loaded: 4
+ LOG  ========== FETCH PROCESSED MODELS SUCCESS ==========
+ WARN  [IconSymbol] Invalid Material Icon name: location_on, using help-outline as fallback
+ WARN  [IconSymbol] Invalid Material Icon name: location_on, using help-outline as fallback
+ LOG  📂 Fetching project by ID: 6902c85ca632191d30cf530b
+ LOG  
+========== FETCHING MEDIA FILES (MOBILE) ==========
+ LOG  📷 Fetching media files for project: 6902c85ca632191d30cf530b
+ LOG  📍 Endpoint: https://photoforge.base44.app/api/functions/getMediaFilesMobile
+ LOG  🔐 Access key (first 10 chars): wqrkJMKYwt...
+ LOG  
+========== FETCHING PROCESSED MODELS (MOBILE) ==========
+ LOG  🎨 Fetching processed models for project: 6902c85ca632191d30cf530b
+ LOG  📍 Endpoint: https://photoforge.base44.app/api/functions/getProcessedModelsMobile
+ LOG  🔐 Access key (first 10 chars): wqrkJMKYwt...
+2025-11-17T17:53:45.156Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T17:53:45.157Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+ LOG  📊 Status: 200 
+ LOG  📄 Response data: {"success":true,"data":[{"project_id":"6902c85ca632191d30cf530b","model_name":"House TEst","model_type":"photogrammetry","status":"completed","output_url":"https://adsk-rc-photofly-prod.s3.amazonaws.c...
+ LOG  ✅ Processed models loaded: 4
+ LOG  ========== FETCH PROCESSED MODELS SUCCESS ==========
+ LOG  📊 Status: 200 
+ LOG  📄 Response data: {"success":true,"data":[{"project_id":"6902c85ca632191d30cf530b","file_url":"https://base44.app/api/apps/690296354ba3d0234bf160ca/files/public/690296354ba3d0234bf160ca/a263940dd_SING0037.JPG","file_na...
+ LOG  ✅ Media files loaded: 410
+ LOG  ========== FETCH MEDIA FILES SUCCESS ==========
+2025-11-17T17:53:47.407Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T17:53:47.407Z expo:start:server:metro:router Using app as the root directory for Expo Router.
+2025-11-17T17:53:49.511Z expo:start:server:middleware:manifest Resolved entry point: index.ts (project root: /expo-project)
+2025-11-17T17:53:49.512Z expo:start:server:metro:router Using app as the root directory for Expo Router.
