@@ -137,6 +137,9 @@ export default function AutodeskSettingsScreen() {
   const [showProjectPicker, setShowProjectPicker] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(false);
 
+  // Processing Method Selection
+  const [processingMethod, setProcessingMethod] = useState<"local" | "cloud">("cloud");
+
   // Quality Settings
   const [quality, setQuality] = useState<"low" | "medium" | "high" | "ultra">("high");
   
@@ -222,13 +225,15 @@ export default function AutodeskSettingsScreen() {
           if (result.data.status === "completed") {
             Alert.alert(
               "Processing Complete! 🎉",
-              "Your 3D model has been successfully processed and is ready to view.",
+              processingMethod === "cloud" 
+                ? "Your 3D model has been successfully processed in the cloud and is ready to download."
+                : "Your 3D model has been successfully processed and is ready to view.",
               [
                 {
                   text: "View Project",
                   onPress: () => {
                     router.push({
-                      pathname: "/project-detail",
+                      pathname: "/completed-models/[projectId]",
                       params: {
                         projectId: selectedProjectId,
                         projectName: selectedProjectName,
@@ -338,6 +343,7 @@ export default function AutodeskSettingsScreen() {
       if (generateDEM) outputTypes.push("dem");
 
       const processingSettings = {
+        processing_method: processingMethod,
         quality,
         output_types: outputTypes,
         formats: {
@@ -361,6 +367,7 @@ export default function AutodeskSettingsScreen() {
         console.log("✅ Processing started successfully");
         console.log("   - Model ID:", result.data.model_id);
         console.log("   - Job ID:", result.data.job_id);
+        console.log("   - Method:", processingMethod);
 
         // Start polling for status
         setProcessingModelId(result.data.model_id);
@@ -378,7 +385,9 @@ export default function AutodeskSettingsScreen() {
         setTimeout(() => {
           Alert.alert(
             "Processing Started! 🚀",
-            `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nYou can monitor the progress on the project page.`
+            processingMethod === "cloud"
+              ? `Your 3D model is being processed in the cloud.\n\nJob ID: ${result.data.job_id}\n\nYou will be able to download the files once processing is complete.`
+              : `Your 3D model processing has been queued.\n\nJob ID: ${result.data.job_id}\n\nYou can monitor the progress on the project page.`
           );
         }, 500);
       } else {
@@ -461,8 +470,25 @@ export default function AutodeskSettingsScreen() {
         </View>
 
         <Text style={styles.subtitle}>
-          Configure Autodesk Reality Capture settings for 3D model generation
+          Configure 3D processing settings for model generation
         </Text>
+
+        {/* Legacy Notice for Autodesk RealityScan */}
+        <View style={styles.legacyNotice}>
+          <IconSymbol
+            ios_icon_name="exclamationmark.triangle.fill"
+            android_material_icon_name="warning"
+            size={24}
+            color={colors.warning}
+          />
+          <View style={styles.legacyNoticeContent}>
+            <Text style={styles.legacyNoticeTitle}>⚠️ Legacy Notice</Text>
+            <Text style={styles.legacyNoticeText}>
+              Autodesk RealityScan is now legacy and will be removed on January 1st, 2026. 
+              Please use Cloud Processing for future projects.
+            </Text>
+          </View>
+        </View>
 
         {/* Processing Status Bar */}
         {processingStatus && (
@@ -533,6 +559,50 @@ export default function AutodeskSettingsScreen() {
               color={colors.textSecondary}
             />
           </Pressable>
+        </View>
+
+        {/* Processing Method Selection */}
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Processing Method</Text>
+          <View style={styles.segmentedControl}>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                processingMethod === "local" && styles.segmentButtonActive,
+              ]}
+              onPress={() => setProcessingMethod("local")}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  processingMethod === "local" && styles.segmentTextActive,
+                ]}
+              >
+                Local (Legacy)
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.segmentButton,
+                processingMethod === "cloud" && styles.segmentButtonActive,
+              ]}
+              onPress={() => setProcessingMethod("cloud")}
+            >
+              <Text
+                style={[
+                  styles.segmentText,
+                  processingMethod === "cloud" && styles.segmentTextActive,
+                ]}
+              >
+                Cloud Processing
+              </Text>
+            </Pressable>
+          </View>
+          <Text style={styles.helpText}>
+            {processingMethod === "local" 
+              ? "⚠️ Legacy method using Autodesk RealityScan (will be removed Jan 1, 2026)"
+              : "☁️ Recommended: Cloud processing with downloadable files upon completion"}
+          </Text>
         </View>
 
         {/* Quality Settings */}
@@ -817,7 +887,9 @@ export default function AutodeskSettingsScreen() {
             <Text style={styles.infoText}>
               • Processing time varies based on quality and image count{'\n'}
               • Maximum 250 files per processing job{'\n'}
-              • You&apos;ll receive a notification when complete{'\n'}
+              • {processingMethod === "cloud" 
+                  ? "Cloud processing: Files will be available for download when complete" 
+                  : "Local processing: Results will be viewable in the app"}{'\n'}
               • You can leave this page and continue using the app
             </Text>
           </View>
@@ -1055,6 +1127,30 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: "center",
     marginBottom: 24,
+  },
+  legacyNotice: {
+    flexDirection: "row",
+    padding: 16,
+    backgroundColor: colors.warning + "20",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.warning,
+    marginBottom: 24,
+    gap: 12,
+  },
+  legacyNoticeContent: {
+    flex: 1,
+  },
+  legacyNoticeTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  legacyNoticeText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    lineHeight: 20,
   },
   statusCard: {
     backgroundColor: colors.surface + "CC",
