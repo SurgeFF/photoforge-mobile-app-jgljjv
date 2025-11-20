@@ -35,11 +35,13 @@ interface ProcessedModel {
   file_size?: number;
   resolution?: string;
   created_date?: string;
+  processing_method?: "local" | "cloud";
   download_urls?: {
     mesh?: string;
     textures?: string;
     point_cloud?: string;
     orthomosaic?: string;
+    dem?: string;
   };
   coordinate_system?: string;
   poly_count?: number;
@@ -148,6 +150,7 @@ export default function CompletedModelsScreen() {
   const renderModel = (model: ProcessedModel, index: number) => {
     const modelName = model.name || model.model_name || `Model ${index + 1}`;
     const hasDownloads = model.download_urls || model.output_url;
+    const isCloudProcessed = model.processing_method === "cloud";
 
     return (
       <View key={model.id || index} style={styles.modelCard}>
@@ -163,16 +166,31 @@ export default function CompletedModelsScreen() {
               {modelName}
             </Text>
           </View>
-          <View style={styles.statusBadge}>
-            <IconSymbol
-              ios_icon_name="checkmark.circle.fill"
-              android_material_icon_name="check_circle"
-              size={16}
-              color={colors.success}
-            />
-            <Text style={[styles.statusBadgeText, { color: colors.success }]}>
-              COMPLETED
-            </Text>
+          <View style={styles.badgeRow}>
+            <View style={styles.statusBadge}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check_circle"
+                size={16}
+                color={colors.success}
+              />
+              <Text style={[styles.statusBadgeText, { color: colors.success }]}>
+                COMPLETED
+              </Text>
+            </View>
+            {isCloudProcessed && (
+              <View style={styles.cloudBadge}>
+                <IconSymbol
+                  ios_icon_name="cloud.fill"
+                  android_material_icon_name="cloud"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={[styles.cloudBadgeText, { color: colors.primary }]}>
+                  CLOUD
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
@@ -254,7 +272,9 @@ export default function CompletedModelsScreen() {
 
         {hasDownloads && (
           <View style={styles.downloadSection}>
-            <Text style={styles.downloadTitle}>Download Options:</Text>
+            <Text style={styles.downloadTitle}>
+              {isCloudProcessed ? "☁️ Download Files:" : "Download Options:"}
+            </Text>
             <View style={styles.downloadButtons}>
               {model.download_urls?.mesh && (
                 <Pressable
@@ -310,6 +330,20 @@ export default function CompletedModelsScreen() {
                     color={colors.primary}
                   />
                   <Text style={styles.downloadButtonText}>Orthomosaic</Text>
+                </Pressable>
+              )}
+              {model.download_urls?.dem && (
+                <Pressable
+                  style={styles.downloadButton}
+                  onPress={() => handleDownloadModel(model, "dem")}
+                >
+                  <IconSymbol
+                    ios_icon_name="arrow.down.circle.fill"
+                    android_material_icon_name="download"
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text style={styles.downloadButtonText}>DEM</Text>
                 </Pressable>
               )}
               {model.output_url && !model.download_urls && (
@@ -584,6 +618,11 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     flex: 1,
   },
+  badgeRow: {
+    flexDirection: "row",
+    gap: 8,
+    flexWrap: "wrap",
+  },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -594,6 +633,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   statusBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  cloudBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.primary + "20",
+    borderRadius: 8,
+  },
+  cloudBadgeText: {
     fontSize: 12,
     fontWeight: "700",
   },
