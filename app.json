@@ -1,13 +1,13 @@
-
 {
   "expo": {
-    "name": "photoforge-mobile-app-jgljjv",
-    "slug": "photoforge-mobile-app-jgljjv",
+    "name": "PhotoForge",
+    "slug": "photoforge-mobile-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "scheme": "photoforge",
+    "entryPoint": "./node_modules/expo-router/entry",
     "splash": {
       "image": "./assets/images/natively-dark.png",
       "resizeMode": "contain",
@@ -15,9 +15,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.DroneElite.PhotoForge",
+      "bundleIdentifier": "com.droneelite.photoforge",
       "infoPlist": {
-        ITSAppUsesNonExemptEncryption: false
+        "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to upload and manage images.",
+        "NSCameraUsageDescription": "This app needs access to your camera to take photos.",
+        "NSPhotoLibraryAddUsageDescription": "This app needs access to save images to your photo library."
       }
     },
     "android": {
@@ -25,23 +27,46 @@
         "foregroundImage": "./assets/images/natively-dark.png",
         "backgroundColor": "#000000"
       },
-      "package": "com.droneelite.photoforgemobile"
+      "package": "com.droneelite.photoforgemobile",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ]
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/natively-dark.png"
     },
     "plugins": [
-      "expo-font",
       "expo-router",
-      "expo-web-browser"
+      "expo-font",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
-    "scheme": "photoforge",
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
-      "router": {}
+      "eas": {
+        "projectId": "5455f9c3-db5d-41c6-ba30-0c8362d06fbe"
+      },
+      "router": {
+        "origin": false
+      }
+    },
+    "experiments": {
+      "typedRoutes": false
     }
   }
 }
